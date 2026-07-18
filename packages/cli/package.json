@@ -9,6 +9,11 @@
     "sourceport": "./dist/main.js"
   },
   "dependencies": {
-    "@sourceport/core": "*"
+    "@sourceport/autohome": "*",
+    "@sourceport/core": "*",
+    "@sourceport/dongchedi": "*"
+  },
+  "devDependencies": {
+    "@sourceport/testing": "*"
   }
 }

@@ -43,4 +43,36 @@ describe("PublicHttpBackend", () => {
     expect(result.backend).toBe("public");
     expect(result.evidence[0]?.sourceUrl).toBe("https://example.com/data");
   });
+
+  it("returns a classified blocked result before parsing", async () => {
+    const backend = new PublicHttpBackend({
+      name: "public",
+      request: () => "https://example.com/data",
+      fetch: async () => new Response("login required", { status: 200 }),
+      classify: ({ body }) =>
+        body.includes("login")
+          ? {
+              status: "blocked",
+              code: "auth_required",
+              message: "sign in first",
+              recoveryActions: [
+                {
+                  kind: "login",
+                  description: "sign in with a browser",
+                  requiresUser: true,
+                },
+              ],
+            }
+          : undefined,
+      parse: () => {
+        throw new Error("parser must not run for classified pages");
+      },
+    });
+
+    const result = await backend.execute(context);
+
+    expect(result.status).toBe("blocked");
+    expect(result.failure?.code).toBe("auth_required");
+    expect(result.recoveryActions[0]?.kind).toBe("login");
+  });
 });

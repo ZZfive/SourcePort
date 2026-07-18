@@ -60,3 +60,9 @@ export function humanVerificationRecovery(
         resumeToken,
       };
 }
+
+export function loginRecovery(description: string, backend?: string): RecoveryAction {
+  return backend === undefined
+    ? { kind: "login", description, requiresUser: true }
+    : { kind: "login", description, requiresUser: true, backend };
+}
