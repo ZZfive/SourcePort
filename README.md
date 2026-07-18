@@ -31,5 +31,7 @@ decision engine.
 
 ## Status
 
-SourcePort is in the design phase. See
-[the stable site acquisition design](docs/superpowers/specs/2026-07-18-sourceport-stable-site-acquisition-design.md).
+SourcePort is in implementation planning. See:
+
+- [stable site acquisition design](docs/superpowers/specs/2026-07-18-sourceport-stable-site-acquisition-design.md);
+- [MVP implementation plan](docs/superpowers/plans/2026-07-18-sourceport-mvp-implementation.md).
