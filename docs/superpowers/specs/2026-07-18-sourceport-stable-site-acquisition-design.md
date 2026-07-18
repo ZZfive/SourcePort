@@ -2,7 +2,7 @@
 
 Date: 2026-07-18
 
-Status: Approved architecture, pending written-spec review
+Status: Approved
 
 ## 1. Summary
 
