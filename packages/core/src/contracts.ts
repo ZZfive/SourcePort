@@ -2,23 +2,26 @@ export const SOURCE_STATUSES = ["success", "partial", "stale", "blocked", "faile
 
 export type SourceStatus = (typeof SOURCE_STATUSES)[number];
 
-export type SourceFailureCode =
-  | "invalid_request"
-  | "unsupported_source"
-  | "unsupported_operation"
-  | "unsupported_parameter"
-  | "auth_required"
-  | "human_verification_required"
-  | "rate_limited"
-  | "access_blocked"
-  | "network_error"
-  | "timeout"
-  | "source_drift"
-  | "unexpected_source_shape"
-  | "empty_source_result"
-  | "evidence_requirement_unmet"
-  | "backend_unavailable"
-  | "internal_error";
+export const SOURCE_FAILURE_CODES = [
+  "invalid_request",
+  "unsupported_source",
+  "unsupported_operation",
+  "unsupported_parameter",
+  "auth_required",
+  "human_verification_required",
+  "rate_limited",
+  "access_blocked",
+  "network_error",
+  "timeout",
+  "source_drift",
+  "unexpected_source_shape",
+  "empty_source_result",
+  "evidence_requirement_unmet",
+  "backend_unavailable",
+  "internal_error",
+] as const;
+
+export type SourceFailureCode = (typeof SOURCE_FAILURE_CODES)[number];
 
 export type SourceFailureStage =
   | "validation"
