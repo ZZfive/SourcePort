@@ -1,0 +1,11 @@
+SourcePort includes code adapted from OpenCLI 1.8.6 Dongchedi and Autohome
+adapters.
+
+OpenCLI
+Copyright 2025 jackwener
+Licensed under the Apache License, Version 2.0.
+https://github.com/jackwener/opencli
+
+The adapted files were modified to use SourcePort contracts, schemas, evidence,
+failure classification, and backend routing. See the source comments for the
+specific derived components.

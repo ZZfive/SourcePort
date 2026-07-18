@@ -9,6 +9,12 @@
     },
     {
       "path": "./packages/cli"
+    },
+    {
+      "path": "./sources/dongchedi"
+    },
+    {
+      "path": "./sources/autohome"
     }
   ]
 }

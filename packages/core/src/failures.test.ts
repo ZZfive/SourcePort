@@ -4,6 +4,7 @@ import {
   createFailure,
   humanVerificationRecovery,
   isSourceFailureCode,
+  loginRecovery,
   retryRecovery,
   switchBackendRecovery,
 } from "./failures.js";
@@ -54,6 +55,15 @@ describe("recovery actions", () => {
       description: "verify in browser",
       requiresUser: true,
       resumeToken: "resume-1",
+    });
+  });
+
+  it("creates a user-controlled login recovery", () => {
+    expect(loginRecovery("sign in", "browser")).toEqual({
+      kind: "login",
+      description: "sign in",
+      requiresUser: true,
+      backend: "browser",
     });
   });
 });

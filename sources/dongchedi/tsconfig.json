@@ -8,16 +8,7 @@
   },
   "references": [
     {
-      "path": "../core"
-    },
-    {
-      "path": "../testing"
-    },
-    {
-      "path": "../../sources/dongchedi"
-    },
-    {
-      "path": "../../sources/autohome"
+      "path": "../../packages/core"
     }
   ],
   "include": [

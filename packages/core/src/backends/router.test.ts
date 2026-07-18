@@ -179,6 +179,29 @@ describe("BackendRouter", () => {
     expect(result.diagnostics?.attempts).toHaveLength(2);
   });
 
+  it("tries the next backend when the result explicitly recommends a backend switch", async () => {
+    const switchResult = failed("public", "invalid_request");
+    switchResult.failure = createFailure("auth_required", "login", "classification");
+    switchResult.status = "blocked";
+    switchResult.recoveryActions = [
+      {
+        kind: "switch_backend",
+        description: "use browser",
+        requiresUser: false,
+        backend: "browser",
+      },
+    ];
+    const router = new BackendRouter([
+      backend("public", async () => switchResult),
+      backend("browser", async () => success("browser")),
+    ]);
+
+    const result = await router.execute(request(), operation(["public", "browser"]));
+
+    expect(result.status).toBe("success");
+    expect(result.backend).toBe("browser");
+  });
+
   it("returns human-verification recovery when no fallback succeeds", async () => {
     const router = new BackendRouter([
       backend("browser", async () => failed("browser", "human_verification_required")),

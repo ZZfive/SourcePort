@@ -97,6 +97,9 @@ function shouldTryNext(result: SourceResult, hasNext: boolean): boolean {
   if (result.failure?.code === "human_verification_required") {
     return true;
   }
+  if (result.recoveryActions.some((action) => action.kind === "switch_backend")) {
+    return true;
+  }
   return result.failure?.retryable === true;
 }
 
