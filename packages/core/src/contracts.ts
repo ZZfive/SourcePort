@@ -98,6 +98,18 @@ export interface RecoveryAction {
   resumeToken?: string;
 }
 
+export interface BackendAttempt {
+  backend: string;
+  startedAt: string;
+  finishedAt: string;
+  status: SourceStatus;
+  failureCode?: SourceFailureCode;
+}
+
+export interface SourceDiagnostics {
+  attempts: BackendAttempt[];
+}
+
 export interface SourceResult<T = unknown> {
   requestId: string;
   source: string;
@@ -115,6 +127,7 @@ export interface SourceResult<T = unknown> {
   warnings: SourceWarning[];
   failure?: SourceFailure;
   recoveryActions: RecoveryAction[];
+  diagnostics?: SourceDiagnostics;
 }
 
 export interface ValidationIssue {
