@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateSourceRequest } from "./validate.js";
+import { validateOperationOutput, validateSourceRequest } from "./validate.js";
 
 const operationParametersSchema = {
   type: "object",
@@ -94,6 +94,25 @@ describe("validateSourceRequest", () => {
     if (!result.ok) {
       expect(result.failure.code).toBe("invalid_request");
       expect(result.issues.some((issue) => issue.path === "parameters.limit")).toBe(true);
+    }
+  });
+});
+
+describe("validateOperationOutput", () => {
+  it("rejects output that does not match the operation schema", () => {
+    const result = validateOperationOutput(
+      { value: 1 },
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["value"],
+        properties: { value: { type: "string" } },
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues[0]?.path).toBe("data.value");
     }
   });
 });

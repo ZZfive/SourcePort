@@ -14,8 +14,16 @@ import {
 import {
   classifyDongchediSearchPage,
   parseDongchediSearchPage,
-  type DongchediSeriesSearchData,
 } from "./search-series.js";
+import {
+  classifyDongchediTrimsPage,
+  parseDongchediTrimsPage,
+  type DongchediTrimStatus,
+} from "./list-trims.js";
+import {
+  classifyDongchediTrimConfigurationPage,
+  parseDongchediTrimConfiguration,
+} from "./get-trim-configuration.js";
 
 interface ProcessResult {
   exitCode: number | null;
@@ -59,7 +67,7 @@ function failed(
   context: BackendExecutionContext,
   code: "backend_unavailable" | "auth_required" | "human_verification_required" | "source_drift",
   message: string,
-): SourceResult<DongchediSeriesSearchData> {
+): SourceResult {
   const recoveryActions = code === "auth_required"
     ? [loginRecovery("Log in to Dongchedi in the connected Chrome profile", "dongchedi-browser")]
     : code === "human_verification_required"
@@ -98,9 +106,16 @@ export class DongchediBrowserBackend implements Backend {
     this.#run = options.run ?? defaultRunner;
   }
 
-  async execute(context: BackendExecutionContext): Promise<SourceResult<DongchediSeriesSearchData>> {
-    const parameters = context.request.parameters as { keyword: string; limit?: number };
-    const requestedUrl = `https://www.dongchedi.com/search?keyword=${encodeURIComponent(parameters.keyword)}`;
+  async execute(context: BackendExecutionContext): Promise<SourceResult> {
+    const route = this.#route(context);
+    if (!route) {
+      return failed(
+        context,
+        "source_drift",
+        `Dongchedi browser backend does not support '${context.request.operation}'`,
+      );
+    }
+    const { requestedUrl } = route;
     try {
       const opened = await this.#run(
         this.#command,
@@ -143,7 +158,7 @@ export class DongchediBrowserBackend implements Backend {
       const html = state.nextData
         ? `<script id="__NEXT_DATA__">${String(state.nextData)}</script>`
         : String(state.bodyText ?? "");
-      const classification = classifyDongchediSearchPage(html);
+      const classification = route.classify(html);
       if (classification) {
         return failed(
           context,
@@ -155,9 +170,15 @@ export class DongchediBrowserBackend implements Backend {
           classification.message,
         );
       }
-      const data = parseDongchediSearchPage(html, parameters.limit ?? 15);
-      if (data.items.length === 0) {
-        return failed(context, "source_drift", "Dongchedi browser page exposed no car-series rows");
+      let data: unknown;
+      try {
+        data = route.parse(html);
+      } catch (error) {
+        return failed(
+          context,
+          "source_drift",
+          error instanceof Error ? error.message : "Dongchedi parser failed",
+        );
       }
       const retrievedAt = new Date().toISOString();
       const sourceUrl = typeof state.url === "string" ? state.url : requestedUrl;
@@ -192,5 +213,56 @@ export class DongchediBrowserBackend implements Backend {
         error instanceof Error ? error.message : "OpenCLI browser backend failed",
       );
     }
+  }
+
+  #route(context: BackendExecutionContext): {
+    requestedUrl: string;
+    classify(html: string): ReturnType<typeof classifyDongchediSearchPage>;
+    parse(html: string): unknown;
+  } | undefined {
+    if (context.request.operation === "search-series") {
+      const parameters = context.request.parameters as { keyword: string; limit?: number };
+      return {
+        requestedUrl: `https://www.dongchedi.com/search?keyword=${encodeURIComponent(parameters.keyword)}`,
+        classify: classifyDongchediSearchPage,
+        parse: (html) => {
+          const data = parseDongchediSearchPage(html, parameters.limit ?? 15);
+          if (data.items.length === 0) {
+            throw new Error("Dongchedi browser page exposed no car-series rows");
+          }
+          return data;
+        },
+      };
+    }
+    if (context.request.operation === "list-trims") {
+      const parameters = context.request.parameters as {
+        seriesId: string;
+        status?: DongchediTrimStatus;
+      };
+      return {
+        requestedUrl: `https://www.dongchedi.com/auto/series/${parameters.seriesId}`,
+        classify: classifyDongchediTrimsPage,
+        parse: (html) => {
+          const data = parseDongchediTrimsPage(
+            html,
+            parameters.seriesId,
+            parameters.status ?? "online",
+          );
+          if (data.items.length === 0) {
+            throw new Error("Dongchedi browser page exposed no matching trims");
+          }
+          return data;
+        },
+      };
+    }
+    if (context.request.operation === "get-trim-configuration") {
+      const parameters = context.request.parameters as { trimId: string };
+      return {
+        requestedUrl: `https://www.dongchedi.com/auto/params-carIds-${parameters.trimId}`,
+        classify: classifyDongchediTrimConfigurationPage,
+        parse: (html) => parseDongchediTrimConfiguration(html, parameters.trimId),
+      };
+    }
+    return undefined;
   }
 }

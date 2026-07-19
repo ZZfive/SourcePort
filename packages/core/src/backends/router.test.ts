@@ -167,6 +167,32 @@ describe("BackendRouter", () => {
     expect(calls).toEqual([]);
   });
 
+  it("fails closed and does not retry data that violates the output schema", async () => {
+    const calls: string[] = [];
+    const descriptor = {
+      ...operation(["first", "second"]),
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["expected"],
+        properties: { expected: { type: "string" } },
+      },
+    };
+    const router = new BackendRouter([
+      backend("first", async () => success("first")),
+      backend("second", async () => {
+        calls.push("second");
+        return success("second");
+      }),
+    ]);
+
+    const result = await router.execute(request(), descriptor);
+
+    expect(result.status).toBe("failed");
+    expect(result.failure?.code).toBe("unexpected_source_shape");
+    expect(calls).toEqual([]);
+  });
+
   it("tries another declared backend after a human-verification block", async () => {
     const router = new BackendRouter([
       backend("public", async () => failed("public", "human_verification_required")),

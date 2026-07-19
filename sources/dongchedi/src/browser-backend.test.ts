@@ -56,7 +56,8 @@ describe("DongchediBrowserBackend", () => {
 
     expect(result.status).toBe("success");
     expect(result.backend).toBe("dongchedi-browser");
-    expect(result.data?.items[0]).toEqual(expect.objectContaining({ seriesId: "5273" }));
+    const data = result.data as { items?: Array<{ seriesId?: string }> } | undefined;
+    expect(data?.items?.[0]).toEqual(expect.objectContaining({ seriesId: "5273" }));
     expect(calls).toBe(2);
   });
 

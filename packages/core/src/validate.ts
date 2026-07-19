@@ -5,12 +5,14 @@ import type {
   SourceFailure,
   SourceRequest,
   ValidationIssue,
+  ValidationResult,
 } from "./contracts.js";
 import { sourceRequestSchema } from "./schemas.js";
 
 const ajv = new Ajv({ allErrors: true, strict: true });
 const validateEnvelope = ajv.compile(sourceRequestSchema);
 const operationValidatorCache = new WeakMap<object, ValidateFunction>();
+const outputValidatorCache = new WeakMap<object, ValidateFunction>();
 
 function pointerToPath(pointer: string): string {
   return pointer
@@ -70,6 +72,19 @@ function compileOperationSchema(schema: AnySchema): ValidateFunction {
   return validator;
 }
 
+function compileOutputSchema(schema: AnySchema): ValidateFunction {
+  if (typeof schema === "boolean") {
+    return ajv.compile(schema);
+  }
+  const cached = outputValidatorCache.get(schema);
+  if (cached) {
+    return cached;
+  }
+  const validator = ajv.compile(schema);
+  outputValidatorCache.set(schema, validator);
+  return validator;
+}
+
 export function validateSourceRequest(
   input: unknown,
   operationParametersSchema: AnySchema,
@@ -98,4 +113,21 @@ export function validateSourceRequest(
   }
 
   return { ok: true, value: request };
+}
+
+export function validateOperationOutput(
+  input: unknown,
+  outputSchema: AnySchema,
+): ValidationResult<unknown> {
+  const validateOutput = compileOutputSchema(outputSchema);
+  if (validateOutput(input)) {
+    return { ok: true, value: input };
+  }
+  return {
+    ok: false,
+    issues: (validateOutput.errors ?? []).map((error) => ({
+      path: errorPath(error, "data"),
+      message: error.message ?? "invalid operation output",
+    })),
+  };
 }
