@@ -5,6 +5,7 @@ import {
   createFailure,
   ManualStepBackend,
   PublicHttpBackend,
+  type OperationDescriptor,
   type SourceAdapter,
   type SourceRequest,
   type SourceResult,
@@ -12,8 +13,16 @@ import {
   validateSourceRequest,
 } from "@sourceport/core";
 
-import { dongchediManifest, searchSeriesOperation } from "./manifest.js";
-import { DongchediBrowserBackend } from "./browser-backend.js";
+import {
+  dongchediManifest,
+  getTrimConfigurationOperation,
+  listTrimsOperation,
+  searchSeriesOperation,
+} from "./manifest.js";
+import {
+  DongchediBrowserBackend,
+  type OpenCliProcessRunner,
+} from "./browser-backend.js";
 import {
   classifyDongchediSearchPage,
   parseDongchediSearchPage,
@@ -29,6 +38,7 @@ type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<
 export interface DongchediAdapterOptions {
   fetch?: FetchLike;
   openCliCommand?: string;
+  browserRun?: OpenCliProcessRunner;
 }
 
 interface SearchParameters {
@@ -36,12 +46,17 @@ interface SearchParameters {
   limit?: number;
 }
 
-function failureResult(request: SourceRequest, code: "invalid_request" | "unsupported_operation", message: string): SourceResult {
+function failureResult(
+  request: SourceRequest,
+  descriptor: OperationDescriptor | undefined,
+  code: "invalid_request" | "unsupported_operation",
+  message: string,
+): SourceResult {
   return {
     requestId: request.requestId ?? randomUUID(),
     source: request.source,
     operation: request.operation,
-    operationSchemaVersion: searchSeriesOperation.schemaVersion,
+    operationSchemaVersion: descriptor?.schemaVersion ?? request.operationSchemaVersion ?? "unknown",
     status: "failed",
     evidence: [],
     warnings: [],
@@ -88,6 +103,7 @@ export class DongchediAdapter implements SourceAdapter {
       publicBackend,
       new DongchediBrowserBackend({
         ...(options.openCliCommand ? { command: options.openCliCommand } : {}),
+        ...(options.browserRun ? { run: options.browserRun } : {}),
       }),
       new ManualStepBackend({
         name: "dongchedi-manual",
@@ -101,17 +117,25 @@ export class DongchediAdapter implements SourceAdapter {
   }
 
   operations() {
-    return [searchSeriesOperation];
+    return [searchSeriesOperation, listTrimsOperation, getTrimConfigurationOperation];
   }
 
   async execute(request: SourceRequest, _runtime: SourceRuntime): Promise<SourceResult> {
-    if (request.operation !== searchSeriesOperation.operation) {
-      return failureResult(request, "unsupported_operation", `Unsupported operation '${request.operation}'`);
+    const descriptor = this.operations().find(
+      (candidate) => candidate.operation === request.operation,
+    );
+    if (!descriptor) {
+      return failureResult(
+        request,
+        undefined,
+        "unsupported_operation",
+        `Unsupported operation '${request.operation}'`,
+      );
     }
-    const validation = validateSourceRequest(request, searchSeriesOperation.parametersSchema);
+    const validation = validateSourceRequest(request, descriptor.parametersSchema);
     if (!validation.ok) {
       return {
-        ...failureResult(request, "invalid_request", validation.failure.message),
+        ...failureResult(request, descriptor, "invalid_request", validation.failure.message),
         failure: validation.failure,
         warnings: validation.issues.map((issue) => ({
           code: "validation_issue",
@@ -120,6 +144,6 @@ export class DongchediAdapter implements SourceAdapter {
         })),
       };
     }
-    return this.#router.execute(validation.value, searchSeriesOperation);
+    return this.#router.execute(validation.value, descriptor);
   }
 }

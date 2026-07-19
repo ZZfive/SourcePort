@@ -10,6 +10,7 @@ import type {
 } from "../contracts.js";
 import { createFailure, retryRecovery } from "../failures.js";
 import { validateSourceResult } from "../invariants.js";
+import { validateOperationOutput } from "../validate.js";
 import type { Backend } from "./types.js";
 
 export interface BackendRouterOptions {
@@ -37,6 +38,11 @@ function syntheticFailure(
   message: string,
   backend?: string,
 ): SourceResult {
+  const stage = code === "backend_unavailable"
+    ? "selection"
+    : code === "unexpected_source_shape" || code === "source_drift"
+      ? "parsing"
+      : "transport";
   const result: SourceResult = {
     requestId: request.requestId ?? randomUUID(),
     source: request.source,
@@ -45,7 +51,7 @@ function syntheticFailure(
     status: "failed",
     evidence: [],
     warnings: [],
-    failure: createFailure(code, message, code === "backend_unavailable" ? "selection" : "transport", undefined, backend),
+    failure: createFailure(code, message, stage, undefined, backend),
     recoveryActions: code === "timeout" ? [retryRecovery("retry within a new execution budget")] : [],
   };
   if (backend !== undefined) {
@@ -157,6 +163,20 @@ export class BackendRouter {
           `backend '${current.name}' returned an invalid SourceResult`,
           current.name,
         );
+      } else if (
+        (result.status === "success" || result.status === "partial" || result.status === "stale") &&
+        result.data !== undefined
+      ) {
+        const outputValidation = validateOperationOutput(result.data, operation.outputSchema);
+        if (!outputValidation.ok) {
+          result = syntheticFailure(
+            request,
+            operation,
+            "unexpected_source_shape",
+            `backend '${current.name}' returned data that violated the operation output schema`,
+            current.name,
+          );
+        }
       }
       const finishedAt = this.#now().toISOString();
       const attempt: BackendAttempt = {

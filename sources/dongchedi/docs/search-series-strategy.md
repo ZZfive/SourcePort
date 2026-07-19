@@ -16,16 +16,19 @@ Verified: 2026-07-18 (Asia/Shanghai)
 3. No signature cracking, captcha bypass, or repeated broad requests were
    attempted. The raw login response was not committed because it contained
    environment-specific response data; tests use a minimal sanitized shape.
-4. `opencli doctor` confirmed the local daemon on port 19825. The Browser
-   Bridge extension was not connected at the latest check, so logged-in live
-   success remains externally blocked until the user enables the extension.
+4. On 2026-07-19, `opencli doctor` confirmed daemon `1.8.6`, Chrome extension
+   `1.0.22`, and a connected browser profile. SourcePort then completed two
+   consecutive live `search-series` runs through `dongchedi-browser`.
+5. Both runs returned series `5273` (宝马X5), current price text, a Wuhan search
+   evidence URL, and explicit diagnostics showing the public backend blocked by
+   `auth_required` before the browser backend succeeded.
 
 ## Selected backend order
 
 1. `dongchedi-public`: cheapest live SSR request; succeeds only when real
    `searchData` is present.
-2. `dongchedi-browser`: logged-in browser/OpenCLI bridge. This is the next
-   implementation target because the public path is currently login-gated.
+2. `dongchedi-browser`: logged-in browser/OpenCLI bridge. This is the verified
+   live success path because the public path is currently login-gated.
 3. `dongchedi-manual`: explicit user login or verification pause; never a
    bypass mechanism.
 

@@ -37,12 +37,12 @@ decision engine.
 - The CLI discovers and executes registered operations.
 - Autohome `list-brand-series` and `get-series-score` have passed live
   end-to-end retrieval through SourcePort.
-- Dongchedi `search-series` parses real SSR data, classifies login/captcha/drift
-  states, and has an OpenCLI Browser Bridge fallback. The public route is
-  currently login-gated in the verified environment, so live success requires
-  the browser extension and a logged-in Dongchedi session.
-- Dongchedi exact-trim configuration and the car-research consumer are not yet
-  complete.
+- Dongchedi `search-series`, `list-trims`, and `get-trim-configuration` have
+  passed live end-to-end retrieval through the logged-in OpenCLI Browser Bridge.
+  Exact-trim results retain the full configuration sheet and separately model
+  claimed assistance level, concrete capabilities, operating domains,
+  perception hardware, optional equipment, and unknown system/vendor fields.
+- The car-research consumer, doctor, and cache are not yet complete.
 
 ## Development
 
@@ -75,6 +75,10 @@ For Dongchedi's logged-in fallback:
 ```bash
 node packages/cli/dist/main.js run dongchedi search-series \
   --input '{"keyword":"宝马X5","limit":5}'
+node packages/cli/dist/main.js run dongchedi list-trims \
+  --input '{"seriesId":"5273","status":"online"}'
+node packages/cli/dist/main.js run dongchedi get-trim-configuration \
+  --input '{"trimId":"255925"}'
 ```
 
 The public backend is tried first. When it returns the observed login state,
