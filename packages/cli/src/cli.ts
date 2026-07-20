@@ -5,8 +5,11 @@ import { parseArgs } from "node:util";
 
 import { AutohomeAdapter } from "@sourceport/autohome";
 import {
+  executeWithFreshness,
+  FileCache,
   SourceRegistry,
   SourceRegistryError,
+  type ResultCache,
   type SourceResult,
 } from "@sourceport/core";
 import { DongchediAdapter } from "@sourceport/dongchedi";
@@ -16,6 +19,7 @@ export interface CliDependencies {
   stdout?: (value: string) => void;
   stderr?: (value: string) => void;
   now?: () => Date;
+  cache?: ResultCache;
 }
 
 function writeJson(write: (value: string) => void, value: unknown): void {
@@ -89,6 +93,8 @@ export async function runCli(
           input: { type: "string" },
           "timeout-ms": { type: "string" },
           "retry-budget": { type: "string" },
+          freshness: { type: "string" },
+          "max-age-ms": { type: "string" },
         },
       });
       const input = parsed.values.input;
@@ -117,6 +123,26 @@ export async function runCli(
         writeJson(stderr, cliError("invalid_cli_input", "--retry-budget must be a non-negative integer"));
         return 2;
       }
+      const freshnessMode = parsed.values.freshness;
+      if (
+        freshnessMode !== undefined &&
+        freshnessMode !== "live" &&
+        freshnessMode !== "prefer-live" &&
+        freshnessMode !== "allow-stale"
+      ) {
+        writeJson(
+          stderr,
+          cliError("invalid_cli_input", "--freshness must be live, prefer-live, or allow-stale"),
+        );
+        return 2;
+      }
+      const maxAgeMs = parsed.values["max-age-ms"] === undefined
+        ? undefined
+        : Number(parsed.values["max-age-ms"]);
+      if (maxAgeMs !== undefined && (!Number.isInteger(maxAgeMs) || maxAgeMs < 1)) {
+        writeJson(stderr, cliError("invalid_cli_input", "--max-age-ms must be a positive integer"));
+        return 2;
+      }
 
       const registered = registry.getOperation(source, operation);
       const execution = timeoutMs === undefined && retryBudget === undefined
@@ -125,16 +151,30 @@ export async function runCli(
             ...(timeoutMs === undefined ? {} : { timeoutMs }),
             ...(retryBudget === undefined ? {} : { retryBudget }),
           };
-      const result = await registered.adapter.execute(
-        {
-          requestId: randomUUID(),
-          source,
-          operation,
-          parameters,
-          ...(execution ? { execution } : {}),
-        },
-        { signal: new AbortController().signal, now },
-      );
+      const freshness = freshnessMode === undefined && maxAgeMs === undefined
+        ? undefined
+        : {
+            mode: freshnessMode ?? "live",
+            ...(maxAgeMs === undefined ? {} : { maxAgeMs }),
+          } as const;
+      const request = {
+        requestId: randomUUID(),
+        source,
+        operation,
+        parameters,
+        ...(execution ? { execution } : {}),
+        ...(freshness ? { freshness } : {}),
+      };
+      const result = await executeWithFreshness({
+        request,
+        operation: registered.descriptor,
+        cache: dependencies.cache ?? new FileCache(),
+        executeLive: (liveRequest) => registered.adapter.execute(
+          liveRequest,
+          { signal: new AbortController().signal, now },
+        ),
+        now,
+      });
       writeJson(stdout, result);
       return failureExitCode(result);
     }

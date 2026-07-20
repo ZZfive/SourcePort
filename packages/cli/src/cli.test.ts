@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { SourceRegistry } from "@sourceport/core";
+import {
+  SourceRegistry,
+  type CacheKeyInput,
+  type CacheReadResult,
+  type ResultCache,
+  type SourceResult,
+} from "@sourceport/core";
 import { FakeSourceAdapter } from "@sourceport/testing";
 
 import { runCli } from "./cli.js";
@@ -22,6 +28,23 @@ function registry() {
   const value = new SourceRegistry();
   value.register(new FakeSourceAdapter());
   return value;
+}
+
+class MemoryCache implements ResultCache {
+  value: CacheReadResult = { status: "miss", reason: "not_found" };
+
+  async read(_key: CacheKeyInput): Promise<CacheReadResult> {
+    return this.value;
+  }
+
+  async write(_key: CacheKeyInput, result: SourceResult): Promise<void> {
+    this.value = {
+      status: "hit",
+      keyHash: "memory",
+      storedAt: result.retrievedAt ?? "2026-07-20T00:00:00.000Z",
+      result,
+    };
+  }
 }
 
 describe("SourcePort CLI", () => {
@@ -50,7 +73,7 @@ describe("SourcePort CLI", () => {
     const output = capture();
     const exitCode = await runCli(
       ["run", "fake", "echo", "--input", JSON.stringify({ value: "x" })],
-      { registry: registry(), ...output.io },
+      { registry: registry(), cache: new MemoryCache(), ...output.io },
     );
 
     expect(exitCode).toBe(0);
@@ -74,5 +97,79 @@ describe("SourcePort CLI", () => {
         error: expect.objectContaining({ code: "invalid_cli_input" }),
       }),
     );
+  });
+
+  it("supports explicit stale-cache execution", async () => {
+    const output = capture();
+    const cache = new MemoryCache();
+    cache.value = {
+      status: "hit",
+      keyHash: "memory",
+      storedAt: "2026-07-20T00:00:00.000Z",
+      result: {
+        requestId: "cached-request",
+        source: "fake",
+        operation: "echo",
+        operationSchemaVersion: "1.0.0",
+        status: "success",
+        data: { value: "cached" },
+        backend: "fake-memory",
+        retrievedAt: "2026-07-20T00:00:00.000Z",
+        freshness: { isLive: true, ageMs: 0 },
+        evidence: [{
+          id: "cached-evidence",
+          source: "fake",
+          operation: "echo",
+          backend: "fake-memory",
+          retrievedAt: "2026-07-20T00:00:00.000Z",
+          verification: "source-verified",
+        }],
+        warnings: [],
+        recoveryActions: [],
+      },
+    };
+
+    const exitCode = await runCli([
+      "run",
+      "fake",
+      "echo",
+      "--input",
+      JSON.stringify({ value: "x" }),
+      "--freshness",
+      "allow-stale",
+      "--max-age-ms",
+      "7200000",
+    ], {
+      registry: registry(),
+      cache,
+      now: () => new Date("2026-07-20T01:00:00.000Z"),
+      ...output.io,
+    });
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(output.stdout.join(""))).toEqual(expect.objectContaining({
+      status: "stale",
+      backend: "cache",
+      data: { value: "cached" },
+      freshness: { isLive: false, ageMs: 3_600_000 },
+    }));
+  });
+
+  it("rejects unknown freshness modes as CLI input", async () => {
+    const output = capture();
+    const exitCode = await runCli([
+      "run",
+      "fake",
+      "echo",
+      "--input",
+      JSON.stringify({ value: "x" }),
+      "--freshness",
+      "sometimes",
+    ], { registry: registry(), cache: new MemoryCache(), ...output.io });
+
+    expect(exitCode).toBe(2);
+    expect(JSON.parse(output.stderr.join(""))).toEqual(expect.objectContaining({
+      error: expect.objectContaining({ code: "invalid_cli_input" }),
+    }));
   });
 });
