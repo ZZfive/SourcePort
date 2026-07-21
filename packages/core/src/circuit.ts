@@ -2,6 +2,11 @@ export interface CircuitBreakerOptions {
   failureThreshold?: number;
 }
 
+export interface CircuitSnapshot {
+  state: "open" | "closed";
+  failureCount: number;
+}
+
 export class CircuitBreaker {
   readonly #failureThreshold: number;
   readonly #failures = new Map<string, number>();
@@ -16,6 +21,13 @@ export class CircuitBreaker {
 
   isOpen(key: string): boolean {
     return this.#open.has(key);
+  }
+
+  snapshot(key: string): CircuitSnapshot {
+    return {
+      state: this.#open.has(key) ? "open" : "closed",
+      failureCount: this.#failures.get(key) ?? 0,
+    };
   }
 
   recordFailure(key: string): void {

@@ -18,6 +18,50 @@ const context: BackendExecutionContext = {
 };
 
 describe("DongchediBrowserBackend", () => {
+  it("distinguishes a missing OpenCLI executable", async () => {
+    const error = Object.assign(new Error("spawn opencli ENOENT"), { code: "ENOENT" });
+    const backend = new DongchediBrowserBackend({
+      run: async () => {
+        throw error;
+      },
+    });
+
+    await expect(backend.configuration(context.signal)).resolves.toEqual(expect.objectContaining({
+      issueCode: "dependency_missing",
+    }));
+  });
+
+  it("detects disconnected daemon or extension even when OpenCLI doctor exits zero", async () => {
+    const backend = new DongchediBrowserBackend({
+      run: async (_command, args) => args[0] === "--version"
+        ? { exitCode: 0, stdout: "1.8.6", stderr: "" }
+        : {
+            exitCode: 0,
+            stdout: "[MISSING] Daemon: not running\n[MISSING] Extension: not connected\n[FAIL] Connectivity: failed",
+            stderr: "",
+          },
+    });
+
+    await expect(backend.configuration(context.signal)).resolves.toEqual(expect.objectContaining({
+      issueCode: "dependency_unavailable",
+      message: expect.stringContaining("Extension"),
+    }));
+  });
+
+  it("accepts a connected OpenCLI Browser Bridge", async () => {
+    const backend = new DongchediBrowserBackend({
+      run: async (_command, args) => args[0] === "--version"
+        ? { exitCode: 0, stdout: "1.8.6", stderr: "" }
+        : {
+            exitCode: 0,
+            stdout: "[OK] Daemon: running\n[OK] Extension: connected\n[OK] Connectivity: passed",
+            stderr: "",
+          },
+    });
+
+    await expect(backend.configuration(context.signal)).resolves.toBeUndefined();
+  });
+
   it("opens the logged-in page and parses browser page state", async () => {
     const nextData = JSON.stringify({
       props: {

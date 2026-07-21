@@ -35,6 +35,10 @@ decision engine.
   capability registry, bounded routing, diagnostics, and circuit breaking are
   implemented.
 - The CLI discovers and executes registered operations.
+- Explicit `live`, `prefer-live`, and `allow-stale` freshness policies are
+  implemented with evidence-preserving filesystem cache storage.
+- `sourceport doctor` reports health per source, operation, and backend,
+  including OpenCLI configuration, live probe results, and circuit state.
 - Autohome `list-brand-series` and `get-series-score` have passed live
   end-to-end retrieval through SourcePort.
 - Dongchedi `search-series`, `list-trims`, and `get-trim-configuration` have
@@ -42,7 +46,7 @@ decision engine.
   Exact-trim results retain the full configuration sheet and separately model
   claimed assistance level, concrete capabilities, operating domains,
   perception hardware, optional equipment, and unknown system/vendor fields.
-- The car-research consumer, doctor, and cache are not yet complete.
+- The car-research consumer is not yet complete.
 
 ## Development
 
@@ -63,6 +67,36 @@ node packages/cli/dist/main.js run autohome list-brand-series \
 node packages/cli/dist/main.js run autohome get-series-score \
   --input '{"seriesId":"6548"}'
 ```
+
+Requests are live by default and successful live results seed the cache without
+changing the returned result. Cache reads are always explicit:
+
+```bash
+node packages/cli/dist/main.js run autohome get-series-score \
+  --input '{"seriesId":"6548"}' \
+  --freshness prefer-live --max-age-ms 86400000
+node packages/cli/dist/main.js run autohome get-series-score \
+  --input '{"seriesId":"6548"}' \
+  --freshness allow-stale --max-age-ms 86400000
+```
+
+Cached results remain labeled `stale`, retain their original retrieval time and
+evidence, and never hide a blocked live attempt. Cache files are stored outside
+the repository in the platform user-cache directory. Set
+`SOURCEPORT_CACHE_DIR` to use another location.
+
+Run bounded, read-only live health probes with:
+
+```bash
+node packages/cli/dist/main.js doctor
+node packages/cli/dist/main.js doctor autohome
+node packages/cli/dist/main.js doctor dongchedi --json --timeout-ms 15000
+```
+
+Human-readable output is the default; `--json` emits the stable `DoctorReport`
+shape. A healthy fallback makes an operation `degraded`, not blocked. Login or
+captcha produces exit code `3` only when the operation has no usable automated
+backend.
 
 For Dongchedi's logged-in fallback:
 

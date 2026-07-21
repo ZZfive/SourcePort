@@ -88,4 +88,36 @@ describe("DongchediAdapter search-series", () => {
     expect(result.failure?.code).toBe("unsupported_parameter");
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it("reports a disconnected OpenCLI bridge as unconfigured without opening browser pages", async () => {
+    const browserRun = vi.fn(async (_command: string, args: string[]) => args[0] === "--version"
+      ? { exitCode: 0, stdout: "1.8.6", stderr: "" }
+      : args[0] === "doctor"
+        ? {
+            exitCode: 0,
+            stdout: "[MISSING] Daemon: not running\n[MISSING] Extension: not connected\n[FAIL] Connectivity: failed",
+            stderr: "",
+          }
+        : (() => {
+            throw new Error("browser page command must not run while OpenCLI is unconfigured");
+          })());
+    const adapter = new DongchediAdapter({
+      fetch: async () => new Response(validHtml, { status: 200 }),
+      browserRun,
+    });
+
+    const health = await adapter.health({ ...runtime, timeoutMs: 15_000 });
+
+    expect(health.state).toBe("unconfigured");
+    expect(health.operations.find((operation) => operation.operation === "search-series")?.state).toBe("healthy");
+    expect(health.operations.find((operation) => operation.operation === "list-trims")?.state).toBe("unconfigured");
+    expect(health.operations.flatMap((operation) => operation.backends)).toContainEqual(
+      expect.objectContaining({
+        backend: "dongchedi-browser",
+        state: "unconfigured",
+        issueCode: "dependency_unavailable",
+      }),
+    );
+    expect(browserRun).toHaveBeenCalledTimes(2);
+  });
 });

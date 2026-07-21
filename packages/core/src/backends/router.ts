@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { OperationDescriptor } from "../adapter.js";
-import { CircuitBreaker } from "../circuit.js";
+import { CircuitBreaker, type CircuitSnapshot } from "../circuit.js";
 import type {
   BackendAttempt,
   SourceFailureCode,
@@ -66,8 +66,10 @@ async function executeWithTimeout(
   operation: OperationDescriptor,
   attempt: number,
   timeoutMs: number,
+  parentSignal?: AbortSignal,
 ): Promise<SourceResult> {
   const controller = new AbortController();
+  const signal = parentSignal ? AbortSignal.any([controller.signal, parentSignal]) : controller.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<SourceResult>((resolve) => {
     timer = setTimeout(() => {
@@ -77,7 +79,7 @@ async function executeWithTimeout(
   });
   try {
     return await Promise.race([
-      backend.execute({ request, operation, signal: controller.signal, attempt }),
+      backend.execute({ request, operation, signal, attempt }),
       timeout,
     ]);
   } finally {
@@ -109,6 +111,40 @@ function shouldTryNext(result: SourceResult, hasNext: boolean): boolean {
   return result.failure?.retryable === true;
 }
 
+function validateBackendResult(
+  result: SourceResult,
+  request: SourceRequest,
+  operation: OperationDescriptor,
+  backend: string,
+): SourceResult {
+  const validation = validateSourceResult(result);
+  if (!validation.ok) {
+    return syntheticFailure(
+      request,
+      operation,
+      "internal_error",
+      `backend '${backend}' returned an invalid SourceResult`,
+      backend,
+    );
+  }
+  if (
+    (result.status === "success" || result.status === "partial" || result.status === "stale") &&
+    result.data !== undefined
+  ) {
+    const outputValidation = validateOperationOutput(result.data, operation.outputSchema);
+    if (!outputValidation.ok) {
+      return syntheticFailure(
+        request,
+        operation,
+        "unexpected_source_shape",
+        `backend '${backend}' returned data that violated the operation output schema`,
+        backend,
+      );
+    }
+  }
+  return result;
+}
+
 export class BackendRouter {
   readonly #backends = new Map<string, Backend>();
   readonly #circuit: CircuitBreaker;
@@ -123,6 +159,51 @@ export class BackendRouter {
     }
     this.#circuit = options.circuit ?? new CircuitBreaker();
     this.#now = options.now ?? (() => new Date());
+  }
+
+  circuitSnapshot(operation: OperationDescriptor, backend: string): CircuitSnapshot {
+    return this.#circuit.snapshot(circuitKey(operation, backend));
+  }
+
+  async probe(
+    request: SourceRequest,
+    operation: OperationDescriptor,
+    backendName: string,
+    signal?: AbortSignal,
+  ): Promise<SourceResult> {
+    const declared = operation.backends.some((descriptor) => descriptor.name === backendName);
+    const backend = declared ? this.#backends.get(backendName) : undefined;
+    if (!backend) {
+      return syntheticFailure(
+        request,
+        operation,
+        "backend_unavailable",
+        `backend '${backendName}' is not available for '${operation.source}.${operation.operation}'`,
+        backendName,
+      );
+    }
+
+    const timeoutMs = request.execution?.timeoutMs ?? 15_000;
+    const startedAt = this.#now().toISOString();
+    let result = await executeWithTimeout(backend, request, operation, 1, timeoutMs, signal);
+    result = validateBackendResult(result, request, operation, backendName);
+    const finishedAt = this.#now().toISOString();
+    const attempt: BackendAttempt = {
+      backend: backendName,
+      startedAt,
+      finishedAt,
+      status: result.status,
+    };
+    if (result.failure) {
+      attempt.failureCode = result.failure.code;
+    }
+    const key = circuitKey(operation, backendName);
+    if (result.status === "success" || result.status === "partial" || result.status === "stale") {
+      this.#circuit.recordSuccess(key);
+    } else {
+      this.#circuit.recordFailure(key);
+    }
+    return withAttempts(result, [attempt]);
   }
 
   async execute(request: SourceRequest, operation: OperationDescriptor): Promise<SourceResult> {
@@ -154,30 +235,7 @@ export class BackendRouter {
       }
       const startedAt = this.#now().toISOString();
       let result = await executeWithTimeout(current, request, operation, index + 1, timeoutMs);
-      const validation = validateSourceResult(result);
-      if (!validation.ok) {
-        result = syntheticFailure(
-          request,
-          operation,
-          "internal_error",
-          `backend '${current.name}' returned an invalid SourceResult`,
-          current.name,
-        );
-      } else if (
-        (result.status === "success" || result.status === "partial" || result.status === "stale") &&
-        result.data !== undefined
-      ) {
-        const outputValidation = validateOperationOutput(result.data, operation.outputSchema);
-        if (!outputValidation.ok) {
-          result = syntheticFailure(
-            request,
-            operation,
-            "unexpected_source_shape",
-            `backend '${current.name}' returned data that violated the operation output schema`,
-            current.name,
-          );
-        }
-      }
+      result = validateBackendResult(result, request, operation, current.name);
       const finishedAt = this.#now().toISOString();
       const attempt: BackendAttempt = {
         backend: current.name,

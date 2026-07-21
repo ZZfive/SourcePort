@@ -4,6 +4,7 @@ import type {
   SourceAdapter,
   SourceManifest,
 } from "./adapter.js";
+import type { SourceHealth, SourceHealthRuntime } from "./health.js";
 
 export type SourceRegistryErrorCode =
   | "duplicate_source"
@@ -101,6 +102,10 @@ export class SourceRegistry {
       );
     }
     return { adapter: registered.adapter, descriptor };
+  }
+
+  health(source: string, runtime: SourceHealthRuntime): Promise<SourceHealth> {
+    return this.#source(source).adapter.health(runtime);
   }
 
   #source(source: string): RegisteredSource {

@@ -7,12 +7,15 @@ import { AutohomeAdapter } from "@sourceport/autohome";
 import {
   executeWithFreshness,
   FileCache,
+  runDoctor,
   SourceRegistry,
   SourceRegistryError,
   type ResultCache,
   type SourceResult,
 } from "@sourceport/core";
 import { DongchediAdapter } from "@sourceport/dongchedi";
+
+import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
 export interface CliDependencies {
   registry?: SourceRegistry;
@@ -76,6 +79,38 @@ export async function runCli(
       }
       writeJson(stdout, { source, operations: registry.listCapabilities(source) });
       return 0;
+    }
+
+    if (command === "doctor") {
+      const sourceArgument = argv[1];
+      const source = sourceArgument && !sourceArgument.startsWith("-") ? sourceArgument : undefined;
+      const parsed = parseArgs({
+        args: [...argv.slice(source ? 2 : 1)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          json: { type: "boolean", default: false },
+          "timeout-ms": { type: "string" },
+        },
+      });
+      const timeoutMs = parsed.values["timeout-ms"] === undefined
+        ? undefined
+        : Number(parsed.values["timeout-ms"]);
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 1)) {
+        writeJson(stderr, cliError("invalid_cli_input", "--timeout-ms must be a positive integer"));
+        return 2;
+      }
+      const report = await runDoctor(registry, {
+        ...(source ? { source } : {}),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        now,
+      });
+      if (parsed.values.json) {
+        writeJson(stdout, report);
+      } else {
+        stdout(formatDoctorHuman(report));
+      }
+      return doctorExitCode(report);
     }
 
     if (command === "run") {
@@ -181,7 +216,7 @@ export async function runCli(
 
     writeJson(
       stderr,
-      cliError("invalid_cli_input", "expected sources, capabilities, or run command"),
+      cliError("invalid_cli_input", "expected sources, capabilities, run, or doctor command"),
     );
     return 2;
   } catch (error) {

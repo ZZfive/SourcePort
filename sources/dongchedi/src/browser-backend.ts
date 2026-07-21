@@ -8,6 +8,7 @@ import {
   loginRecovery,
   type Backend,
   type BackendExecutionContext,
+  type BackendConfigurationIssue,
   type SourceResult,
 } from "@sourceport/core";
 
@@ -104,6 +105,52 @@ export class DongchediBrowserBackend implements Backend {
     this.#command = options.command ?? "opencli";
     this.#session = options.session ?? "sourceport-dongchedi";
     this.#run = options.run ?? defaultRunner;
+  }
+
+  async configuration(signal: AbortSignal): Promise<BackendConfigurationIssue | undefined> {
+    let version: ProcessResult;
+    try {
+      version = await this.#run(this.#command, ["--version"], signal);
+    } catch (error) {
+      const missing = (error as NodeJS.ErrnoException).code === "ENOENT" ||
+        (error instanceof Error && /ENOENT|not found/i.test(error.message));
+      return {
+        issueCode: missing ? "dependency_missing" : "dependency_unavailable",
+        message: missing
+          ? `OpenCLI executable '${this.#command}' is not installed or not on PATH`
+          : `OpenCLI version check failed: ${error instanceof Error ? error.message : "unknown error"}`,
+      };
+    }
+    if (version.exitCode !== 0) {
+      return {
+        issueCode: "dependency_unavailable",
+        message: `OpenCLI version check exited with code ${String(version.exitCode)}`,
+      };
+    }
+
+    let doctor: ProcessResult;
+    try {
+      doctor = await this.#run(this.#command, ["doctor"], signal);
+    } catch (error) {
+      return {
+        issueCode: "dependency_unavailable",
+        message: `OpenCLI doctor failed: ${error instanceof Error ? error.message : "unknown error"}`,
+      };
+    }
+    const output = `${doctor.stdout}\n${doctor.stderr}`.trim();
+    if (doctor.exitCode !== 0 || /\[(?:MISSING|FAIL)\]/i.test(output)) {
+      return {
+        issueCode: "dependency_unavailable",
+        message: output.slice(0, 1000) || `OpenCLI doctor exited with code ${String(doctor.exitCode)}`,
+      };
+    }
+    if (!/\[OK\].*Connectivity/i.test(output)) {
+      return {
+        issueCode: "dependency_unavailable",
+        message: `OpenCLI doctor returned an unrecognized connectivity result: ${output.slice(0, 800)}`,
+      };
+    }
+    return undefined;
   }
 
   async execute(context: BackendExecutionContext): Promise<SourceResult> {

@@ -281,4 +281,33 @@ describe("BackendRouter", () => {
     expect(calls).toBe(2);
     expect(third.failure?.code).toBe("backend_unavailable");
   });
+
+  it("lets a bounded doctor probe bypass and close an open circuit", async () => {
+    const circuit = new CircuitBreaker({ failureThreshold: 1 });
+    let calls = 0;
+    const router = new BackendRouter([
+      backend("recovering", async () => {
+        calls += 1;
+        return calls === 1
+          ? failed("recovering", "network_error")
+          : success("recovering");
+      }),
+    ], { circuit });
+    const descriptor = operation(["recovering"]);
+
+    await router.execute(request(), descriptor);
+    expect(router.circuitSnapshot(descriptor, "recovering")).toEqual({
+      state: "open",
+      failureCount: 1,
+    });
+
+    const result = await router.probe(request(), descriptor, "recovering");
+
+    expect(result.status).toBe("success");
+    expect(calls).toBe(2);
+    expect(router.circuitSnapshot(descriptor, "recovering")).toEqual({
+      state: "closed",
+      failureCount: 0,
+    });
+  });
 });

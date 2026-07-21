@@ -48,6 +48,16 @@ const adapter = (source: string, operationNames: string[]): SourceAdapter => ({
     },
     recoveryActions: [],
   }),
+  health: async (runtime) => ({
+    source,
+    displayName: source.toUpperCase(),
+    state: "healthy",
+    available: true,
+    checkedAt: runtime.now().toISOString(),
+    durationMs: 0,
+    recoveryActions: [],
+    operations: [],
+  }),
 });
 
 describe("SourceRegistry", () => {

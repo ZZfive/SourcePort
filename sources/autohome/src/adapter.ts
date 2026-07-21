@@ -1,16 +1,19 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  aggregateSourceHealth,
   BackendRouter,
   createFailure,
   humanVerificationRecovery,
   ManualStepBackend,
   PublicHttpBackend,
+  probeOperationHealth,
   type OperationDescriptor,
   type SourceAdapter,
   type SourceRequest,
   type SourceResult,
   type SourceRuntime,
+  type SourceHealthRuntime,
   validateSourceRequest,
 } from "@sourceport/core";
 
@@ -151,5 +154,31 @@ export class AutohomeAdapter implements SourceAdapter {
       };
     }
     return this.#router.execute(validation.value, descriptor);
+  }
+
+  async health(runtime: SourceHealthRuntime) {
+    const startedAt = runtime.now();
+    const checkedAt = startedAt.toISOString();
+    const operations = await Promise.all([
+      probeOperationHealth({
+        operation: listBrandSeriesOperation,
+        router: this.#router,
+        parameters: { brand: "宝马", limit: 1 },
+        runtime,
+      }),
+      probeOperationHealth({
+        operation: getSeriesScoreOperation,
+        router: this.#router,
+        parameters: { seriesId: "6548" },
+        runtime,
+      }),
+    ]);
+    return aggregateSourceHealth({
+      source: autohomeManifest.source,
+      displayName: autohomeManifest.displayName,
+      checkedAt,
+      durationMs: Math.max(0, runtime.now().getTime() - startedAt.getTime()),
+      operations,
+    });
   }
 }

@@ -1,10 +1,14 @@
 import {
+  aggregateOperationHealth,
+  aggregateSourceHealth,
+  backendHealthFromResult,
   createEvidenceRecord,
   type OperationDescriptor,
   type SourceAdapter,
   type SourceRequest,
   type SourceResult,
   type SourceRuntime,
+  type SourceHealthRuntime,
   validateSourceRequest,
 } from "@sourceport/core";
 
@@ -85,5 +89,34 @@ export class FakeSourceAdapter implements SourceAdapter {
       warnings: [],
       recoveryActions: [],
     };
+  }
+
+  async health(runtime: SourceHealthRuntime) {
+    const startedAt = runtime.now();
+    const checkedAt = startedAt.toISOString();
+    const result = await this.execute(
+      {
+        requestId: "fake-health",
+        source: "fake",
+        operation: "echo",
+        parameters: { value: "health" },
+      },
+      runtime,
+    );
+    const backend = backendHealthFromResult({
+      descriptor: echoOperation.backends[0]!,
+      result,
+      checkedAt,
+      durationMs: 0,
+      circuit: { state: "closed", failureCount: 0 },
+    });
+    const operation = aggregateOperationHealth("fake", "echo", checkedAt, [backend]);
+    return aggregateSourceHealth({
+      source: "fake",
+      displayName: "Fake Source",
+      checkedAt,
+      durationMs: Math.max(0, runtime.now().getTime() - startedAt.getTime()),
+      operations: [operation],
+    });
   }
 }

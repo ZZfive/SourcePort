@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  aggregateSourceHealth,
   BackendRouter,
   createFailure,
   ManualStepBackend,
   PublicHttpBackend,
+  probeOperationHealth,
+  skippedBackendHealth,
   type OperationDescriptor,
   type SourceAdapter,
   type SourceRequest,
   type SourceResult,
+  type BackendHealth,
+  type SourceHealthRuntime,
   type SourceRuntime,
+  unconfiguredBackendHealth,
   validateSourceRequest,
 } from "@sourceport/core";
 
@@ -67,6 +73,7 @@ function failureResult(
 
 export class DongchediAdapter implements SourceAdapter {
   readonly #router: BackendRouter;
+  readonly #browserBackend: DongchediBrowserBackend;
 
   constructor(options: DongchediAdapterOptions = {}) {
     const publicBackend = new PublicHttpBackend<DongchediSeriesSearchData>({
@@ -99,12 +106,13 @@ export class DongchediAdapter implements SourceAdapter {
         return data;
       },
     });
+    this.#browserBackend = new DongchediBrowserBackend({
+      ...(options.openCliCommand ? { command: options.openCliCommand } : {}),
+      ...(options.browserRun ? { run: options.browserRun } : {}),
+    });
     this.#router = new BackendRouter([
       publicBackend,
-      new DongchediBrowserBackend({
-        ...(options.openCliCommand ? { command: options.openCliCommand } : {}),
-        ...(options.browserRun ? { run: options.browserRun } : {}),
-      }),
+      this.#browserBackend,
       new ManualStepBackend({
         name: "dongchedi-manual",
         description: "Log in to Dongchedi or complete access verification, then retry",
@@ -145,5 +153,73 @@ export class DongchediAdapter implements SourceAdapter {
       };
     }
     return this.#router.execute(validation.value, descriptor);
+  }
+
+  async health(runtime: SourceHealthRuntime) {
+    const startedAt = runtime.now();
+    const checkedAt = startedAt.toISOString();
+    const configurationStartedAt = runtime.now();
+    const configurationIssue = await this.#browserBackend.configuration(runtime.signal);
+    const configurationDurationMs = Math.max(
+      0,
+      runtime.now().getTime() - configurationStartedAt.getTime(),
+    );
+    let blockedBrowser: BackendHealth | undefined;
+    const probes = [
+      { operation: searchSeriesOperation, parameters: { keyword: "宝马X5", limit: 1 } },
+      { operation: listTrimsOperation, parameters: { seriesId: "5273", status: "online" } },
+      { operation: getTrimConfigurationOperation, parameters: { trimId: "255925" } },
+    ] as const;
+    const operations = [];
+    for (const probe of probes) {
+      const operationHealth = await probeOperationHealth({
+        operation: probe.operation,
+        router: this.#router,
+        parameters: probe.parameters,
+        runtime,
+        overrideBackend: (descriptor, circuit) => {
+          if (descriptor.name !== this.#browserBackend.name) {
+            return undefined;
+          }
+          if (configurationIssue) {
+            return unconfiguredBackendHealth({
+              source: probe.operation.source,
+              operation: probe.operation.operation,
+              descriptor,
+              checkedAt: runtime.now().toISOString(),
+              issue: configurationIssue,
+              durationMs: configurationDurationMs,
+              circuit,
+            });
+          }
+          if (blockedBrowser) {
+            return skippedBackendHealth({
+              source: probe.operation.source,
+              operation: probe.operation.operation,
+              descriptor,
+              checkedAt: runtime.now().toISOString(),
+              state: "blocked",
+              ...(blockedBrowser.issueCode ? { issueCode: blockedBrowser.issueCode } : {}),
+              message: "browser probe skipped after an earlier Dongchedi login or verification block",
+              recoveryActions: blockedBrowser.recoveryActions,
+              circuit,
+            });
+          }
+          return undefined;
+        },
+      });
+      operations.push(operationHealth);
+      const browser = operationHealth.backends.find((backend) => backend.backend === this.#browserBackend.name);
+      if (browser?.state === "blocked") {
+        blockedBrowser = browser;
+      }
+    }
+    return aggregateSourceHealth({
+      source: dongchediManifest.source,
+      displayName: dongchediManifest.displayName,
+      checkedAt,
+      durationMs: Math.max(0, runtime.now().getTime() - startedAt.getTime()),
+      operations,
+    });
   }
 }

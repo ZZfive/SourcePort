@@ -1,6 +1,7 @@
 import type { AnySchema } from "ajv";
 
 import type { SourceRequest, SourceResult } from "./contracts.js";
+import type { SourceHealth, SourceHealthRuntime } from "./health.js";
 
 export interface SourceManifest {
   source: string;
@@ -37,6 +38,7 @@ export interface SourceAdapter {
   manifest(): SourceManifest;
   operations(): readonly OperationDescriptor[];
   execute(request: SourceRequest, runtime: SourceRuntime): Promise<SourceResult>;
+  health(runtime: SourceHealthRuntime): Promise<SourceHealth>;
 }
 
 export interface RegisteredOperation {
