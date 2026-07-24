@@ -2,6 +2,42 @@
 
 Date: 2026-07-18
 
+## Execution Status (2026-07-24)
+
+This document remains the approved implementation plan and historical task
+breakdown. It is not a restart checklist. The current user-facing capability
+inventory and commands are maintained in the repository [README](../../../README.md).
+
+The initial implementation line is present on `main` at `c746b2c`. The active
+branch `codex/sourceport-doctor-cache` contains the following two unmerged and
+unpushed implementation commits; this documentation closeout is being kept on
+the same branch:
+
+- `a30fc13 feat(core): add explicit freshness cache`;
+- `fb60a66 feat(cli): add source health diagnostics`.
+
+| Task | Current state | Notes |
+|---|---|---|
+| 1-7 | Implemented | The workspace, contracts, registry, evidence, routing, cache, and CLI exist; some implementation files were consolidated rather than matching every planned path. |
+| 8 | Pending | The reusable adapter-contract/fixture test kit has not been implemented. |
+| 9 | Implemented and live verified | Dongchedi `search-series` is available; its parser tests use sanitized inline source shapes rather than a standalone fixture tree. |
+| 10 | Partial | `list-trims` is implemented; `get-series` and `get-owner-reviews` are not. |
+| 11 | Implemented and live verified | Exact-trim configuration is available for the bounded BMW X5 validation sample. |
+| 12 | Implemented and live verified | Autohome `list-brand-series` and `get-series-score` are available. |
+| 13 | Implemented and live verified | Health contracts and `sourceport doctor` are on the active branch. |
+| 14 | Pending | The car-research consumer skill has not been created. |
+| 15 | Pending | Consumer end-to-end coverage and the remaining authoring/security/live-testing guides are not complete. |
+
+Milestones A-D are implemented. Milestone E remains pending. Live-site claims
+must still be refreshed with bounded probes because authentication, anti-bot
+state, and source shape can change independently of the code.
+
+The bounded doctor refresh on 2026-07-24 found both Autohome operations
+healthy. Dongchedi remained available but degraded: its public
+`search-series` backend required authentication, while the logged-in browser
+fallback and the `list-trims` and `get-trim-configuration` operations were
+healthy.
+
 ## 1. Objective
 
 Implement the approved SourcePort MVP as a TypeScript/Node.js workspace that
@@ -66,9 +102,11 @@ non-deterministic. For these tasks:
 
 ## 4. Branch and Commit Strategy
 
-Implementation begins only after this plan is reviewed.
+The original implementation began after this plan was reviewed. Its initial
+branch was `codex/sourceport-mvp`; current continuation state is recorded in
+the execution-status section above.
 
-- Create branch: `codex/sourceport-mvp`.
+- Initial branch: `codex/sourceport-mvp`.
 - Keep each task independently testable.
 - Commit after each task or tightly coupled task pair.
 - Do not push, publish, or create a pull request without explicit user
@@ -812,8 +850,10 @@ Stop and report rather than guessing when:
 After three failed fixes to the same architectural path, revisit the backend or
 operation boundary with the user instead of attempting a fourth patch.
 
-## 22. Plan Review Gate
+## 22. Continuation Gate
 
-No implementation task begins until the user reviews this plan. After approval,
-start with Task 1 on `codex/sourceport-mvp` and execute milestone by milestone,
-providing verification evidence at every checkpoint.
+The original plan review gate was satisfied before implementation began. Do
+not restart Task 1 or recreate `codex/sourceport-mvp`. Continue from the
+execution-status table, preserve milestone verification evidence, and treat
+the active cache/doctor branch as unintegrated until it is explicitly merged
+and pushed.

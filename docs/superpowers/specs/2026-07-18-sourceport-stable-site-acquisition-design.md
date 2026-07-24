@@ -2,7 +2,14 @@
 
 Date: 2026-07-18
 
-Status: Approved
+Status: Approved target design
+
+> Current implementation note (2026-07-24): this document defines the target
+> architecture and MVP acceptance scope; it is not a current operation
+> inventory. See the repository [README](../../../README.md) for current
+> commands and supported operations, and the
+> [implementation plan](../plans/2026-07-18-sourceport-mvp-implementation.md#execution-status-2026-07-24)
+> for completed and pending tasks.
 
 ## 1. Summary
 
@@ -610,8 +617,7 @@ The design moves to implementation only with these acceptance targets:
 
 ## 21. Implementation Sequence Boundary
 
-The implementation plan will be written only after this design is reviewed. It
-will sequence work from contracts and tests to one vertical Dongchedi operation,
-then routing/evidence/doctor, then the remaining car operations and consumer
-skill. MCP remains outside the MVP and may be added later as another interface
-over the same core.
+This design review boundary was satisfied on 2026-07-18 and the implementation
+plan was subsequently created. The plan now records execution status rather
+than serving as a command to restart implementation. MCP remains outside the
+MVP and may be added later as another interface over the same core.
