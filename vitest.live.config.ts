@@ -7,6 +7,9 @@ export default defineConfig({
       "@sourceport/core": fileURLToPath(
         new URL("./packages/core/src/index.ts", import.meta.url),
       ),
+      "@sourceport/car-research": fileURLToPath(
+        new URL("./packages/car-research/src/index.ts", import.meta.url),
+      ),
       "@sourceport/dongchedi": fileURLToPath(
         new URL("./sources/dongchedi/src/index.ts", import.meta.url),
       ),

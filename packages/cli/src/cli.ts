@@ -1,9 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import { AutohomeAdapter } from "@sourceport/autohome";
+import {
+  createRegistrySourceExecutor,
+  renderCarResearchMarkdown,
+  researchCars,
+  validateCarResearchBrief,
+  type CarResearchReport,
+  type SourceExecutor,
+} from "@sourceport/car-research";
 import {
   executeWithFreshness,
   FileCache,
@@ -23,6 +32,7 @@ export interface CliDependencies {
   stderr?: (value: string) => void;
   now?: () => Date;
   cache?: ResultCache;
+  researchExecutor?: SourceExecutor;
 }
 
 function writeJson(write: (value: string) => void, value: unknown): void {
@@ -38,6 +48,13 @@ function failureExitCode(result: SourceResult): number {
 
 function cliError(code: string, message: string) {
   return { error: { code, message } };
+}
+
+function researchExitCode(report: CarResearchReport): number {
+  if (report.status === "blocked") {
+    return 3;
+  }
+  return report.status === "success" ? 0 : 1;
 }
 
 export function createDefaultRegistry(): SourceRegistry {
@@ -111,6 +128,73 @@ export async function runCli(
         stdout(formatDoctorHuman(report));
       }
       return doctorExitCode(report);
+    }
+
+    if (command === "research-cars") {
+      const parsed = parseArgs({
+        args: [...argv.slice(1)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          input: { type: "string" },
+          "input-file": { type: "string" },
+          format: { type: "string", default: "json" },
+        },
+      });
+      const inlineInput = parsed.values.input;
+      const inputFile = parsed.values["input-file"];
+      if ((inlineInput === undefined) === (inputFile === undefined)) {
+        writeJson(
+          stderr,
+          cliError("invalid_cli_input", "research-cars requires exactly one of --input or --input-file"),
+        );
+        return 2;
+      }
+      const format = parsed.values.format;
+      if (format !== "json" && format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "--format must be json or md"));
+        return 2;
+      }
+      let serialized: string;
+      try {
+        serialized = inlineInput ?? await readFile(inputFile!, "utf8");
+      } catch (error) {
+        writeJson(
+          stderr,
+          cliError(
+            "invalid_cli_input",
+            `cannot read --input-file: ${error instanceof Error ? error.message : "unknown error"}`,
+          ),
+        );
+        return 2;
+      }
+      let brief: unknown;
+      try {
+        brief = JSON.parse(serialized) as unknown;
+      } catch {
+        writeJson(stderr, cliError("invalid_cli_input", "research input must be valid JSON"));
+        return 2;
+      }
+      const briefValidation = validateCarResearchBrief(brief);
+      if (!briefValidation.ok) {
+        writeJson(stderr, {
+          ...cliError("invalid_cli_input", "invalid CarResearchBrief"),
+          issues: briefValidation.issues,
+        });
+        return 2;
+      }
+      const executor = dependencies.researchExecutor ?? createRegistrySourceExecutor({
+        registry,
+        cache: dependencies.cache ?? new FileCache(),
+        now,
+      });
+      const report = await researchCars(brief, { execute: executor, now });
+      if (format === "md") {
+        stdout(renderCarResearchMarkdown(report));
+      } else {
+        writeJson(stdout, report);
+      }
+      return researchExitCode(report);
     }
 
     if (command === "run") {
@@ -216,7 +300,10 @@ export async function runCli(
 
     writeJson(
       stderr,
-      cliError("invalid_cli_input", "expected sources, capabilities, run, or doctor command"),
+      cliError(
+        "invalid_cli_input",
+        "expected sources, capabilities, run, doctor, or research-cars command",
+      ),
     );
     return 2;
   } catch (error) {
