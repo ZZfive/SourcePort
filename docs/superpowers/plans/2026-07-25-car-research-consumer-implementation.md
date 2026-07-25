@@ -164,3 +164,49 @@ context criterion and did not exclude any powertrain.
 Coverage remained bounded to the declared seeds, expansion and scan limits,
 Dongchedi and Autohome, and three exact configuration fetches. This verification
 does not establish full-market coverage or a current Wuhan dealer quotation.
+
+## Installed Skill Forward Verification
+
+After `main` was pushed, the Skill was installed from the published GitHub path
+and compared byte-for-byte with `skills/research-cars`. A fresh Codex task then
+used `$research-cars` for the same Wuhan decision boundary without receiving the
+expected candidates or report contents.
+
+The task independently:
+
+- found `sourceport` on `PATH`;
+- ran both source doctors and continued through Dongchedi only because all
+  required operations remained available through the logged-in fallback;
+- classified budget as hard, assistance and body style as preferences, and no
+  private charger as context;
+- generated eight seed hypotheses and executed a live bounded report;
+- returned five `needs-verification` candidates, zero eligible candidates, and
+  zero evidence-backed hard-condition rejections;
+- preserved all Wuhan on-road budget decisions as `unknown`;
+- reported exact-trim assistance evidence only when configuration retrieval
+  succeeded;
+- stated the bounded coverage and did not describe the result as a market-wide
+  search.
+
+The forward run also exposed two workflow gaps. First, its complete JSON output
+exceeded the terminal capture limit, so the task repeated the same live research
+in Markdown and took about 21 minutes end to end. Second, Autohome rejected the
+common manufacturer spellings `零跑汽车`, `深蓝汽车`, and `小鹏汽车` before
+cross-source matching.
+
+Commit `860e4f7` addressed both findings:
+
+- the Skill now chooses one primary output before execution, uses Markdown for
+  ordinary user-facing comparisons, starts an open-ended first pass with five
+  seeds and three exact configurations, and forbids a second live run solely to
+  switch formats or recover truncated output;
+- Autohome brand-initial resolution now normalizes the common `汽车` suffix and
+  includes the missing base brands.
+
+Post-fix live probes resolved `零跑B10` to Autohome `7877`, `深蓝S05` to
+`7740`, and `小鹏MONA M03` to `6998`. Fresh Codex tasks loaded the updated Skill
+and explicitly selected one Markdown execution; their external commands then
+requested task-level user approval. No second live run was claimed or inferred
+from that approval boundary. The original completed live forward task satisfies
+the planned forward-verification gate, while the post-fix source probes and
+fresh-task behavior verify the identified corrections directly.
