@@ -25,6 +25,14 @@ import {
   classifyDongchediTrimConfigurationPage,
   parseDongchediTrimConfiguration,
 } from "./get-trim-configuration.js";
+import {
+  classifyDongchediSeriesPage,
+  parseDongchediSeriesPage,
+} from "./get-series.js";
+import {
+  classifyDongchediOwnerReviewsPage,
+  parseDongchediOwnerReviewsPage,
+} from "./get-owner-reviews.js";
 
 interface ProcessResult {
   exitCode: number | null;
@@ -66,7 +74,12 @@ async function defaultRunner(
 
 function failed(
   context: BackendExecutionContext,
-  code: "backend_unavailable" | "auth_required" | "human_verification_required" | "source_drift",
+  code:
+    | "backend_unavailable"
+    | "auth_required"
+    | "human_verification_required"
+    | "source_drift"
+    | "empty_source_result",
   message: string,
 ): SourceResult {
   const recoveryActions = code === "auth_required"
@@ -83,7 +96,13 @@ function failed(
     backend: "dongchedi-browser",
     evidence: [],
     warnings: [],
-    failure: createFailure(code, message, code === "source_drift" ? "parsing" : "transport", false, "dongchedi-browser"),
+    failure: createFailure(
+      code,
+      message,
+      code === "source_drift" || code === "empty_source_result" ? "parsing" : "transport",
+      false,
+      "dongchedi-browser",
+    ),
     recoveryActions,
   };
 }
@@ -221,10 +240,13 @@ export class DongchediBrowserBackend implements Backend {
       try {
         data = route.parse(html);
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Dongchedi parser failed";
         return failed(
           context,
-          "source_drift",
-          error instanceof Error ? error.message : "Dongchedi parser failed",
+          /no owner reviews|no car-series rows|no matching trims/i.test(message)
+            ? "empty_source_result"
+            : "source_drift",
+          message,
         );
       }
       const retrievedAt = new Date().toISOString();
@@ -300,6 +322,26 @@ export class DongchediBrowserBackend implements Backend {
           }
           return data;
         },
+      };
+    }
+    if (context.request.operation === "get-series") {
+      const parameters = context.request.parameters as { seriesId: string };
+      return {
+        requestedUrl: `https://www.dongchedi.com/auto/series/${parameters.seriesId}`,
+        classify: classifyDongchediSeriesPage,
+        parse: (html) => parseDongchediSeriesPage(html, parameters.seriesId),
+      };
+    }
+    if (context.request.operation === "get-owner-reviews") {
+      const parameters = context.request.parameters as { seriesId: string; limit?: number };
+      return {
+        requestedUrl: `https://www.dongchedi.com/auto/series/score/${parameters.seriesId}-x-x-x-x-x`,
+        classify: classifyDongchediOwnerReviewsPage,
+        parse: (html) => parseDongchediOwnerReviewsPage(
+          html,
+          parameters.seriesId,
+          parameters.limit ?? 5,
+        ),
       };
     }
     if (context.request.operation === "get-trim-configuration") {

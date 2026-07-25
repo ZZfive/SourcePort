@@ -71,6 +71,127 @@ const browserBackends: OperationDescriptor["backends"] = [
   { name: "dongchedi-manual", kind: "manual-step", priority: 1 },
 ];
 
+const publicWithBrowserBackends = (name: string): OperationDescriptor["backends"] => [
+  { name, kind: "public-http", priority: 0 },
+  { name: "dongchedi-browser", kind: "browser-session", priority: 1 },
+  { name: "dongchedi-manual", kind: "manual-step", priority: 2 },
+];
+
+export const getSeriesOperation: OperationDescriptor = {
+  source: "dongchedi",
+  operation: "get-series",
+  description: "Retrieve one Dongchedi series overview with prices, score, ranks, and trim count",
+  access: "read",
+  schemaVersion: "1.0.0",
+  parametersSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["seriesId"],
+    properties: {
+      seriesId: { type: "string", pattern: "^[1-9][0-9]*$" },
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "seriesId",
+      "name",
+      "brand",
+      "subBrand",
+      "officialPrice",
+      "dealerPrice",
+      "usedPrice",
+      "score",
+      "reviewCount",
+      "saleRank",
+      "scoreRank",
+      "onSaleTrimCount",
+      "sourceUrl",
+    ],
+    properties: {
+      seriesId: { type: "string", pattern: "^[1-9][0-9]*$" },
+      name: { type: "string", minLength: 1 },
+      brand: { type: "string", minLength: 1 },
+      subBrand: { type: "string" },
+      officialPrice: { type: "string" },
+      dealerPrice: { type: "string" },
+      usedPrice: { type: "string" },
+      score: { anyOf: [{ type: "number", minimum: 0, maximum: 5 }, { type: "null" }] },
+      reviewCount: { anyOf: [{ type: "number", minimum: 0 }, { type: "null" }] },
+      saleRank: { type: "string" },
+      scoreRank: { type: "string" },
+      onSaleTrimCount: {
+        anyOf: [{ type: "integer", minimum: 0 }, { type: "null" }],
+      },
+      sourceUrl: { type: "string", minLength: 1 },
+    },
+  },
+  backends: publicWithBrowserBackends("dongchedi-series-public"),
+  auth: "human-assisted",
+  freshnessClass: "volatile",
+};
+
+export const getOwnerReviewsOperation: OperationDescriptor = {
+  source: "dongchedi",
+  operation: "get-owner-reviews",
+  description: "Retrieve bounded Dongchedi owner reviews for one car series",
+  access: "read",
+  schemaVersion: "1.0.0",
+  parametersSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["seriesId"],
+    properties: {
+      seriesId: { type: "string", pattern: "^[1-9][0-9]*$" },
+      limit: { type: "integer", minimum: 1, maximum: 15, default: 5 },
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["seriesId", "items"],
+    properties: {
+      seriesId: { type: "string", pattern: "^[1-9][0-9]*$" },
+      items: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "reviewId",
+            "rank",
+            "userDisplayName",
+            "trim",
+            "score",
+            "likes",
+            "comments",
+            "excerpt",
+            "sourceUrl",
+          ],
+          properties: {
+            reviewId: { type: "string", pattern: "^[1-9][0-9]*$" },
+            rank: { type: "integer", minimum: 1 },
+            userDisplayName: { type: "string", minLength: 1 },
+            trim: { type: "string" },
+            score: {
+              anyOf: [{ type: "number", minimum: 0, maximum: 5 }, { type: "null" }],
+            },
+            likes: { type: "number", minimum: 0 },
+            comments: { type: "number", minimum: 0 },
+            excerpt: { type: "string", minLength: 1 },
+            sourceUrl: { type: "string", minLength: 1 },
+          },
+        },
+      },
+    },
+  },
+  backends: publicWithBrowserBackends("dongchedi-owner-reviews-public"),
+  auth: "human-assisted",
+  freshnessClass: "volatile",
+};
+
 export const listTrimsOperation: OperationDescriptor = {
   source: "dongchedi",
   operation: "list-trims",

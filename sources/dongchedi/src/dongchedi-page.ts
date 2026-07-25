@@ -1,5 +1,9 @@
 import type { PublicHttpClassification } from "@sourceport/core";
-import { humanVerificationRecovery, loginRecovery } from "@sourceport/core";
+import {
+  humanVerificationRecovery,
+  loginRecovery,
+  switchBackendRecovery,
+} from "@sourceport/core";
 
 export interface DongchediNextData {
   page?: unknown;
@@ -52,6 +56,10 @@ export function classifyDongchediBasePage(
       message: "Dongchedi requires a logged-in browser session",
       recoveryActions: [
         loginRecovery("Log in to Dongchedi in the connected Chrome profile", "dongchedi-browser"),
+        switchBackendRecovery(
+          "dongchedi-browser",
+          "Retry through the logged-in Dongchedi browser session",
+        ),
       ],
     };
   }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { BackendExecutionContext } from "@sourceport/core";
 
 import { DongchediBrowserBackend, type OpenCliProcessRunner } from "./browser-backend.js";
-import { searchSeriesOperation } from "./manifest.js";
+import { getSeriesOperation, searchSeriesOperation } from "./manifest.js";
 
 const context: BackendExecutionContext = {
   request: {
@@ -103,6 +103,60 @@ describe("DongchediBrowserBackend", () => {
     const data = result.data as { items?: Array<{ seriesId?: string }> } | undefined;
     expect(data?.items?.[0]).toEqual(expect.objectContaining({ seriesId: "5273" }));
     expect(calls).toBe(2);
+  });
+
+  it("uses the same typed parser for the series browser fallback", async () => {
+    const nextData = JSON.stringify({
+      props: {
+        pageProps: {
+          seriesId: "5273",
+          seriesHomeHead: {
+            series_id: 5273,
+            series_name: "宝马X5",
+            brand_name: "宝马",
+            official_price: "59.80-74.80万",
+          },
+          scoreSimpleInfo: {},
+          rankData: {},
+          carModelsData: { tab_list: [] },
+        },
+      },
+    });
+    let calls = 0;
+    const backend = new DongchediBrowserBackend({
+      run: async () => {
+        calls += 1;
+        return calls === 1
+          ? { exitCode: 0, stdout: "", stderr: "" }
+          : {
+              exitCode: 0,
+              stdout: JSON.stringify({
+                url: "https://www.dongchedi.com/auto/series/5273",
+                nextData,
+                bodyText: "",
+              }),
+              stderr: "",
+            };
+      },
+    });
+
+    const result = await backend.execute({
+      request: {
+        requestId: "series-request",
+        source: "dongchedi",
+        operation: "get-series",
+        parameters: { seriesId: "5273" },
+      },
+      operation: getSeriesOperation,
+      signal: new AbortController().signal,
+      attempt: 1,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      status: "success",
+      backend: "dongchedi-browser",
+      data: expect.objectContaining({ seriesId: "5273", name: "宝马X5" }),
+    }));
   });
 
   it("reports a missing Browser Bridge as unconfigured", async () => {

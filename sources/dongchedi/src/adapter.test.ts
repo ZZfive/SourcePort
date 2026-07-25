@@ -4,11 +4,11 @@ import type { SourceRequest } from "@sourceport/core";
 
 import { DongchediAdapter } from "./adapter.js";
 
-function request(parameters: unknown): SourceRequest {
+function request(parameters: unknown, operation = "search-series"): SourceRequest {
   return {
     requestId: "request-1",
     source: "dongchedi",
-    operation: "search-series",
+    operation,
     parameters,
   };
 }
@@ -25,6 +25,39 @@ const validHtml = `<script id="__NEXT_DATA__">${JSON.stringify({
             display: { series_name: "宝马X5", official_price: "59.80-74.80万" },
           },
         ],
+      },
+    },
+  },
+})}</script>`;
+
+const seriesHtml = `<script id="__NEXT_DATA__">${JSON.stringify({
+  props: {
+    pageProps: {
+      seriesId: "5273",
+      seriesHomeHead: {
+        series_id: 5273,
+        series_name: "宝马X5",
+        brand_name: "宝马",
+        official_price: "59.80-74.80万",
+      },
+      scoreSimpleInfo: { score: 441, total_review_count: 100 },
+      rankData: {},
+      carModelsData: { tab_list: [{ tab_key: "online_all", data: [] }] },
+    },
+  },
+})}</script>`;
+
+const reviewsHtml = `<script id="__NEXT_DATA__">${JSON.stringify({
+  props: {
+    pageProps: {
+      reviewListData: {
+        review_list: [{
+          gid_str: "7399912345678901234",
+          user_info: { name: "车主" },
+          buy_car_info: { year: 2025, car_name: "xDrive30Li" },
+          score_info: { score: 438 },
+          content: "评价正文",
+        }],
       },
     },
   },
@@ -51,6 +84,39 @@ describe("DongchediAdapter search-series", () => {
       }),
     );
     expect(result.evidence[0]?.sourceUrl).toContain("/search?keyword=");
+  });
+
+  it("retrieves series overview and owner reviews through public SSR pages", async () => {
+    const adapter = new DongchediAdapter({
+      fetch: async (input) => {
+        const url = String(input);
+        return new Response(url.includes("/score/") ? reviewsHtml : seriesHtml, {
+          status: 200,
+        });
+      },
+    });
+
+    const series = await adapter.execute(
+      request({ seriesId: "5273" }, "get-series"),
+      runtime,
+    );
+    const reviews = await adapter.execute(
+      request({ seriesId: "5273", limit: 1 }, "get-owner-reviews"),
+      runtime,
+    );
+
+    expect(series).toEqual(expect.objectContaining({
+      status: "success",
+      backend: "dongchedi-series-public",
+      data: expect.objectContaining({ seriesId: "5273", name: "宝马X5" }),
+    }));
+    expect(reviews).toEqual(expect.objectContaining({
+      status: "success",
+      backend: "dongchedi-owner-reviews-public",
+      data: expect.objectContaining({
+        items: [expect.objectContaining({ reviewId: "7399912345678901234" })],
+      }),
+    }));
   });
 
   it("returns explicit login recovery for the live login-required state", async () => {
@@ -102,7 +168,13 @@ describe("DongchediAdapter search-series", () => {
             throw new Error("browser page command must not run while OpenCLI is unconfigured");
           })());
     const adapter = new DongchediAdapter({
-      fetch: async () => new Response(validHtml, { status: 200 }),
+      fetch: async (input) => {
+        const url = String(input);
+        return new Response(
+          url.includes("/score/") ? reviewsHtml : url.includes("/auto/series/") ? seriesHtml : validHtml,
+          { status: 200 },
+        );
+      },
       browserRun,
     });
 
@@ -110,6 +182,8 @@ describe("DongchediAdapter search-series", () => {
 
     expect(health.state).toBe("unconfigured");
     expect(health.operations.find((operation) => operation.operation === "search-series")?.state).toBe("healthy");
+    expect(health.operations.find((operation) => operation.operation === "get-series")?.state).toBe("healthy");
+    expect(health.operations.find((operation) => operation.operation === "get-owner-reviews")?.state).toBe("healthy");
     expect(health.operations.find((operation) => operation.operation === "list-trims")?.state).toBe("unconfigured");
     expect(health.operations.flatMap((operation) => operation.backends)).toContainEqual(
       expect.objectContaining({
