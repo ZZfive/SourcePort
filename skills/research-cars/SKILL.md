@@ -27,6 +27,10 @@ run SourcePort, and explain the evidence without hiding unknowns or conflicts.
      explicitly converts them into an exclusion;
    - generate at most eight brand or series seeds and treat them as hypotheses,
      never as evidence;
+   - for an open-ended first pass, prefer five seeds and set explicit limits of
+     eight expanded series, five scanned series, three exact configurations,
+     five final candidates, and three owner reviews per series; increase them
+     only when the added evidence could change the decision;
    - do not invent tax, insurance, registration, dealer-quote, or policy
      evidence.
 5. Read [criteria-and-evidence.md](references/criteria-and-evidence.md) when
@@ -35,14 +39,18 @@ run SourcePort, and explain the evidence without hiding unknowns or conflicts.
 6. Read [driving-assistance.md](references/driving-assistance.md) whenever the
    request mentions intelligent driving, ADAS, ADS, autonomous driving,
    parking, sensors, chips, subscriptions, or exact trim availability.
-7. Write the brief as JSON with the available file-edit mechanism, then run:
+7. Choose one primary output before execution. Use Markdown for a normal
+   user-facing comparison. Use JSON only when programmatic inspection is
+   necessary and the environment can retain the complete output. Write the
+   brief with the available file-edit mechanism, then run exactly once:
 
    ```bash
-   sourceport research-cars --input-file <brief.json> --format json
+   sourceport research-cars --input-file <brief.json> --format <md|json>
    ```
 
-   Use `--format md` only when a human-readable report is the requested final
-   artifact. Keep JSON for analysis and evidence inspection.
+   Do not repeat a completed live research solely to switch formats or recover
+   truncated terminal output. Choose Markdown before execution when a full
+   JSON report is likely to exceed the tool's output limit.
 8. Explain candidates in the report's deterministic order. Separate eligible,
    needs-verification, and rejected candidates. Cite evidence URLs or IDs for
    decision-relevant claims.

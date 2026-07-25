@@ -30,6 +30,9 @@ describe("Autohome list-brand-series", () => {
     expect(resolveBrandInitial("吉利汽车")).toBe("J");
     expect(resolveBrandInitial("奇瑞汽车")).toBe("Q");
     expect(resolveBrandInitial("奇瑞风云")).toBe("Q");
+    expect(resolveBrandInitial("零跑汽车")).toBe("L");
+    expect(resolveBrandInitial("深蓝汽车")).toBe("S");
+    expect(resolveBrandInitial("小鹏汽车")).toBe("X");
     expect(resolveBrandInitial("b")).toBe("B");
     expect(() => resolveBrandInitial("不存在的品牌")).toThrow(/unknown brand/);
   });

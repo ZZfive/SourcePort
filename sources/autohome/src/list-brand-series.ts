@@ -18,6 +18,7 @@ const BRAND_INITIALS: Readonly<Record<string, string>> = {
   别克: "B",
   本田: "B",
   保时捷: "B",
+  宝骏: "B",
   长安: "C",
   长安启源: "C",
   大众: "D",
@@ -43,6 +44,7 @@ const BRAND_INITIALS: Readonly<Record<string, string>> = {
   奇瑞风云: "Q",
   日产: "R",
   荣威: "R",
+  深蓝: "S",
   特斯拉: "T",
   腾势: "T",
   坦克: "T",
@@ -92,7 +94,8 @@ export function resolveBrandInitial(brandInput: string): string {
     return raw.toUpperCase();
   }
   const key = raw.replace(/[·\s]/g, "");
-  const initial = BRAND_INITIALS[key] ?? BRAND_INITIALS[raw];
+  const manufacturer = key.replace(/汽车$/, "");
+  const initial = BRAND_INITIALS[key] ?? BRAND_INITIALS[manufacturer] ?? BRAND_INITIALS[raw];
   if (!initial) {
     throw new Error(`unknown brand '${brandInput}'`);
   }
