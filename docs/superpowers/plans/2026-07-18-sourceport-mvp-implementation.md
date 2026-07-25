@@ -8,13 +8,13 @@ This document remains the approved implementation plan and historical task
 breakdown. It is not a restart checklist. The current user-facing capability
 inventory and commands are maintained in the repository [README](../../../README.md).
 
-The initial implementation line is present on `main` at `c746b2c`. The active
+The initial implementation line is present on `main` at `cc1703a`. The active
 branch `codex/sourceport-doctor-cache` contains the following two unmerged and
 unpushed implementation commits; this documentation closeout is being kept on
 the same branch:
 
-- `a30fc13 feat(core): add explicit freshness cache`;
-- `fb60a66 feat(cli): add source health diagnostics`.
+- `28be22f feat(core): add explicit freshness cache`;
+- `c8e1ae4 feat(cli): add source health diagnostics`.
 
 | Task | Current state | Notes |
 |---|---|---|
