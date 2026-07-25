@@ -301,6 +301,7 @@ export function validateCarResearchBrief(input: unknown): BriefValidationResult 
     if (!Array.isArray(input["costEvidence"])) {
       issues.push({ path: "costEvidence", message: "costEvidence must be an array" });
     } else {
+      const ids = new Set<string>();
       input["costEvidence"].forEach((evidence, index) => {
         if (!isObject(evidence)) {
           issues.push({ path: `costEvidence.${index}`, message: "cost evidence must be an object" });
@@ -313,11 +314,41 @@ export function validateCarResearchBrief(input: unknown): BriefValidationResult 
         }
         if (typeof evidence["id"] !== "string" || !evidence["id"].trim()) {
           issues.push({ path: `costEvidence.${index}.id`, message: "id must be non-empty" });
+        } else if (ids.has(evidence["id"])) {
+          issues.push({ path: `costEvidence.${index}.id`, message: "cost evidence IDs must be unique" });
+        } else {
+          ids.add(evidence["id"]);
+        }
+        if (!["vehicle-price", "purchase-tax", "insurance", "registration", "other"].includes(String(evidence["component"]))) {
+          issues.push({ path: `costEvidence.${index}.component`, message: "component is invalid" });
+        }
+        if (typeof evidence["mandatory"] !== "boolean") {
+          issues.push({ path: `costEvidence.${index}.mandatory`, message: "mandatory must be boolean" });
+        }
+        if (typeof evidence["source"] !== "string" || !evidence["source"].trim()) {
+          issues.push({ path: `costEvidence.${index}.source`, message: "source must be non-empty" });
+        }
+        if (typeof evidence["applicability"] !== "string" || !evidence["applicability"].trim()) {
+          issues.push({ path: `costEvidence.${index}.applicability`, message: "applicability must be non-empty" });
         }
         if (typeof evidence["retrievedAt"] !== "string" || Number.isNaN(Date.parse(evidence["retrievedAt"]))) {
           issues.push({ path: `costEvidence.${index}.retrievedAt`, message: "retrievedAt must be an ISO date" });
         }
       });
+    }
+  }
+  if (input["freshness"] !== undefined) {
+    const freshness = input["freshness"];
+    if (!isObject(freshness) || !["live", "prefer-live", "allow-stale"].includes(String(freshness["mode"]))) {
+      issues.push({ path: "freshness", message: "freshness mode is invalid" });
+    } else {
+      const maxAge = freshness["maxAgeMs"];
+      if (freshness["mode"] === "live" && maxAge !== undefined) {
+        issues.push({ path: "freshness.maxAgeMs", message: "live freshness cannot include maxAgeMs" });
+      }
+      if (freshness["mode"] !== "live" && (!positiveInteger(maxAge))) {
+        issues.push({ path: "freshness.maxAgeMs", message: "cache freshness requires a positive maxAgeMs" });
+      }
     }
   }
   return issues.length === 0

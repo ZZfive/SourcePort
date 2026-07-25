@@ -248,14 +248,34 @@ export async function researchCars(
     operation: string,
     parameters: unknown,
   ): Promise<CallResult<T>> => {
-    const result = await dependencies.execute({
-      requestId: randomUUID(),
-      source,
-      operation,
-      parameters,
-      ...(brief.freshness ? { freshness: brief.freshness } : {}),
-      ...(brief.execution ? { execution: brief.execution } : {}),
-    });
+    let result: SourceResult;
+    try {
+      result = await dependencies.execute({
+        requestId: randomUUID(),
+        source,
+        operation,
+        parameters,
+        ...(brief.freshness ? { freshness: brief.freshness } : {}),
+        ...(brief.execution ? { execution: brief.execution } : {}),
+      });
+    } catch (error) {
+      result = {
+        requestId: randomUUID(),
+        source,
+        operation,
+        operationSchemaVersion: "unknown",
+        status: "failed",
+        evidence: [],
+        warnings: [],
+        failure: {
+          code: "internal_error",
+          message: error instanceof Error ? error.message : "source executor threw an unknown error",
+          stage: "transport",
+          retryable: false,
+        },
+        recoveryActions: [],
+      };
+    }
     result.evidence.forEach((record) => evidence.set(record.id, record));
     result.warnings.forEach(addWarning);
     result.recoveryActions.forEach((action) => recoveryActions.set(recoveryKey(action), action));
@@ -508,6 +528,7 @@ export async function researchCars(
   const builtCandidates: CarCandidate[] = [];
   let scannedSeries = 0;
   let configuredTrims = 0;
+  let configurationAttempts = 0;
   for (const draft of orderedDrafts) {
     if (scannedSeries >= limits.scannedSeries) {
       break;
@@ -542,7 +563,8 @@ export async function researchCars(
       continue;
     }
     let configuration: CallResult<DongchediConfigurationData> | undefined;
-    if (configuredTrims < limits.exactConfigurations) {
+    if (configurationAttempts < limits.exactConfigurations) {
+      configurationAttempts += 1;
       configuration = await call<DongchediConfigurationData>(
         "dongchedi",
         "get-trim-configuration",
