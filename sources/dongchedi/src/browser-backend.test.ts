@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { BackendExecutionContext } from "@sourceport/core";
 
 import { DongchediBrowserBackend, type OpenCliProcessRunner } from "./browser-backend.js";
-import { getSeriesOperation, searchSeriesOperation } from "./manifest.js";
+import {
+  getOwnerReviewsOperation,
+  getSeriesOperation,
+  listTrimsOperation,
+  searchSeriesOperation,
+} from "./manifest.js";
 
 const context: BackendExecutionContext = {
   request: {
@@ -157,6 +162,121 @@ describe("DongchediBrowserBackend", () => {
       backend: "dongchedi-browser",
       data: expect.objectContaining({ seriesId: "5273", name: "宝马X5" }),
     }));
+  });
+
+  it("fetches owner-review SSR through the existing logged-in page without navigation", async () => {
+    const nextData = JSON.stringify({
+      props: {
+        pageProps: {
+          reviewListData: {
+            review_list: [{
+              gid_str: "7399912345678901234",
+              user_info: { name: "车主" },
+              buy_car_info: { year: 2026, car_name: "xDrive40Li" },
+              score_info: { score: 460 },
+              content: "评价正文",
+            }],
+          },
+        },
+      },
+    });
+    const calls: string[][] = [];
+    const backend = new DongchediBrowserBackend({
+      run: async (_command, args) => {
+        calls.push(args);
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({
+            url: "https://www.dongchedi.com/auto/series/score/5273-x-x-x-x-x",
+            nextData,
+            bodyText: "",
+          }),
+          stderr: "",
+        };
+      },
+    });
+
+    const result = await backend.execute({
+      request: {
+        requestId: "reviews-request",
+        source: "dongchedi",
+        operation: "get-owner-reviews",
+        parameters: { seriesId: "5273", limit: 1 },
+      },
+      operation: getOwnerReviewsOperation,
+      signal: new AbortController().signal,
+      attempt: 1,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      status: "success",
+      data: expect.objectContaining({
+        items: [expect.objectContaining({ reviewId: "7399912345678901234" })],
+      }),
+    }));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual(expect.arrayContaining(["eval"]));
+    expect(calls[0]).not.toEqual(expect.arrayContaining(["open"]));
+  });
+
+  it("fetches the trim-list SSR through the existing logged-in page without navigation", async () => {
+    const nextData = JSON.stringify({
+      props: {
+        pageProps: {
+          seriesId: "5273",
+          carModelsData: {
+            tab_list: [{
+              tab_key: "online_all",
+              data: [{
+                info: {
+                  car_id: 255925,
+                  name: "xDrive30Li",
+                  year: 2026,
+                  official_price: 59.8,
+                },
+              }],
+            }],
+          },
+        },
+      },
+    });
+    const calls: string[][] = [];
+    const backend = new DongchediBrowserBackend({
+      run: async (_command, args) => {
+        calls.push(args);
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({
+            url: "https://www.dongchedi.com/auto/series/5273",
+            nextData,
+            bodyText: "",
+          }),
+          stderr: "",
+        };
+      },
+    });
+
+    const result = await backend.execute({
+      request: {
+        requestId: "trims-request",
+        source: "dongchedi",
+        operation: "list-trims",
+        parameters: { seriesId: "5273", status: "online" },
+      },
+      operation: listTrimsOperation,
+      signal: new AbortController().signal,
+      attempt: 1,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      status: "success",
+      data: expect.objectContaining({
+        items: [expect.objectContaining({ trimId: "255925" })],
+      }),
+    }));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual(expect.arrayContaining(["eval"]));
+    expect(calls[0]).not.toEqual(expect.arrayContaining(["open"]));
   });
 
   it("reports a missing Browser Bridge as unconfigured", async () => {

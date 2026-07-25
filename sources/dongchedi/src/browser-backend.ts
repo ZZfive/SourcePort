@@ -183,47 +183,57 @@ export class DongchediBrowserBackend implements Backend {
     }
     const { requestedUrl } = route;
     try {
-      const opened = await this.#run(
-        this.#command,
-        ["browser", this.#session, "open", requestedUrl],
-        context.signal,
-      );
-      if (opened.exitCode !== 0) {
-        const detail = `${opened.stderr}\n${opened.stdout}`.trim();
-        return failed(
-          context,
-          "backend_unavailable",
-          detail.includes("extension")
-            ? "OpenCLI Browser Bridge extension is not connected"
-            : `OpenCLI browser open failed: ${detail.slice(0, 500)}`,
+      let state = route.preferInPageFetch
+        ? await this.#inPageFetch(requestedUrl, context.signal)
+        : undefined;
+      if (!state) {
+        const opened = await this.#run(
+          this.#command,
+          ["browser", this.#session, "open", requestedUrl],
+          context.signal,
         );
-      }
+        if (opened.exitCode !== 0) {
+          const detail = `${opened.stderr}\n${opened.stdout}`.trim();
+          return failed(
+            context,
+            "backend_unavailable",
+            detail.includes("extension")
+              ? "OpenCLI Browser Bridge extension is not connected"
+              : `OpenCLI browser open failed: ${detail.slice(0, 500)}`,
+          );
+        }
 
-      const browserState = await this.#run(
-        this.#command,
-        [
-          "browser",
-          this.#session,
-          "eval",
-          `JSON.stringify({url:location.href,title:document.title,nextData:document.querySelector('script#__NEXT_DATA__')?.textContent??null,bodyText:(document.body?.innerText??'').slice(0,2000)})`,
-        ],
-        context.signal,
-      );
-      if (browserState.exitCode !== 0) {
-        return failed(
-          context,
-          "backend_unavailable",
-          `OpenCLI browser eval failed: ${`${browserState.stderr}\n${browserState.stdout}`.trim().slice(0, 500)}`,
+        const browserState = await this.#run(
+          this.#command,
+          [
+            "browser",
+            this.#session,
+            "eval",
+            `JSON.stringify({url:location.href,title:document.title,nextData:document.querySelector('script#__NEXT_DATA__')?.textContent??null,bodyText:(document.body?.innerText??'').slice(0,2000)})`,
+          ],
+          context.signal,
         );
+        if (browserState.exitCode !== 0) {
+          return failed(
+            context,
+            "backend_unavailable",
+            `OpenCLI browser eval failed: ${`${browserState.stderr}\n${browserState.stdout}`.trim().slice(0, 500)}`,
+          );
+        }
+        state = JSON.parse(browserState.stdout) as {
+          url?: unknown;
+          nextData?: unknown;
+          bodyText?: unknown;
+        };
       }
-      const state = JSON.parse(browserState.stdout) as {
+      const resolvedState = state as {
         url?: unknown;
         nextData?: unknown;
         bodyText?: unknown;
       };
-      const html = state.nextData
-        ? `<script id="__NEXT_DATA__">${String(state.nextData)}</script>`
-        : String(state.bodyText ?? "");
+      const html = resolvedState.nextData
+        ? `<script id="__NEXT_DATA__">${String(resolvedState.nextData)}</script>`
+        : String(resolvedState.bodyText ?? "");
       const classification = route.classify(html);
       if (classification) {
         return failed(
@@ -250,7 +260,7 @@ export class DongchediBrowserBackend implements Backend {
         );
       }
       const retrievedAt = new Date().toISOString();
-      const sourceUrl = typeof state.url === "string" ? state.url : requestedUrl;
+      const sourceUrl = typeof resolvedState.url === "string" ? resolvedState.url : requestedUrl;
       return {
         requestId: context.request.requestId ?? randomUUID(),
         source: context.request.source,
@@ -284,8 +294,34 @@ export class DongchediBrowserBackend implements Backend {
     }
   }
 
+  async #inPageFetch(
+    requestedUrl: string,
+    signal: AbortSignal,
+  ): Promise<{ url?: unknown; nextData?: unknown; bodyText?: unknown } | undefined> {
+    const url = JSON.stringify(requestedUrl);
+    const expression = `(async()=>{const response=await fetch(${url},{credentials:'include'});const body=await response.text();const match=body.match(/<script id="__NEXT_DATA__"[^>]*>([\\s\\S]*?)<\\/script>/);return JSON.stringify({url:response.url||${url},nextData:match?.[1]??null,bodyText:match?"":body.slice(0,2000)})})()`;
+    const fetched = await this.#run(
+      this.#command,
+      ["browser", this.#session, "eval", expression],
+      signal,
+    );
+    if (fetched.exitCode !== 0) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(fetched.stdout) as {
+        url?: unknown;
+        nextData?: unknown;
+        bodyText?: unknown;
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   #route(context: BackendExecutionContext): {
     requestedUrl: string;
+    preferInPageFetch?: boolean;
     classify(html: string): ReturnType<typeof classifyDongchediSearchPage>;
     parse(html: string): unknown;
   } | undefined {
@@ -310,6 +346,7 @@ export class DongchediBrowserBackend implements Backend {
       };
       return {
         requestedUrl: `https://www.dongchedi.com/auto/series/${parameters.seriesId}`,
+        preferInPageFetch: true,
         classify: classifyDongchediTrimsPage,
         parse: (html) => {
           const data = parseDongchediTrimsPage(
@@ -336,6 +373,7 @@ export class DongchediBrowserBackend implements Backend {
       const parameters = context.request.parameters as { seriesId: string; limit?: number };
       return {
         requestedUrl: `https://www.dongchedi.com/auto/series/score/${parameters.seriesId}-x-x-x-x-x`,
+        preferInPageFetch: true,
         classify: classifyDongchediOwnerReviewsPage,
         parse: (html) => parseDongchediOwnerReviewsPage(
           html,

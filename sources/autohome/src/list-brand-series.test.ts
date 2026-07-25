@@ -26,8 +26,27 @@ describe("Autohome list-brand-series", () => {
 
   it("maps known brands and allows explicit catalog initials", () => {
     expect(resolveBrandInitial("宝马")).toBe("B");
+    expect(resolveBrandInitial("吉利银河")).toBe("J");
+    expect(resolveBrandInitial("吉利汽车")).toBe("J");
+    expect(resolveBrandInitial("奇瑞汽车")).toBe("Q");
+    expect(resolveBrandInitial("奇瑞风云")).toBe("Q");
     expect(resolveBrandInitial("b")).toBe("B");
     expect(() => resolveBrandInitial("不存在的品牌")).toThrow(/unknown brand/);
+  });
+
+  it("prefers an exact sub-brand block over an earlier parent-brand prefix", () => {
+    const nestedCatalog = `
+      <dl><dt><div><a>奇瑞</a></div></dt><li id="s1"><h4><a>瑞虎</a></h4></li></dl>
+      <dl><dt><div><a>奇瑞风云</a></div></dt><li id="s9500"><h4><a>风云T9</a></h4></li></dl>`;
+
+    expect(parseAutohomeBrandSeries(nestedCatalog, "奇瑞风云", 5)).toEqual([
+      {
+        seriesId: "9500",
+        name: "风云T9",
+        guidePrice: "",
+        sourceUrl: "https://www.autohome.com.cn/9500/",
+      },
+    ]);
   });
 
   it("fails closed on an unexpected catalog shape", () => {

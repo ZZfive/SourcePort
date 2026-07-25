@@ -28,6 +28,8 @@ const BRAND_INITIALS: Readonly<Record<string, string>> = {
   哈弗: "H",
   红旗: "H",
   吉利: "J",
+  吉利汽车: "J",
+  吉利银河: "J",
   极氪: "J",
   捷途: "J",
   凯迪拉克: "K",
@@ -37,6 +39,8 @@ const BRAND_INITIALS: Readonly<Record<string, string>> = {
   岚图: "L",
   马自达: "M",
   奇瑞: "Q",
+  奇瑞汽车: "Q",
+  奇瑞风云: "Q",
   日产: "R",
   荣威: "R",
   特斯拉: "T",
@@ -105,15 +109,15 @@ export function parseAutohomeBrandSeries(
     throw new Error("Autohome catalog returned an unexpected shape; expected brand blocks");
   }
   const wanted = clean(brandName).replace(/[·\s]/g, "");
-  let selected = "";
-  for (const block of blocks) {
+  const candidates = blocks.map((block) => {
     const brandMatch = block.match(/<dt>[\s\S]*?<div>\s*<a[^>]*>([^<]+)<\/a>/);
     const candidate = clean(brandMatch?.[1]).replace(/[·\s]/g, "");
-    if (candidate && (candidate === wanted || candidate.startsWith(wanted) || wanted.startsWith(candidate))) {
-      selected = block;
-      break;
-    }
-  }
+    return { block, candidate };
+  });
+  const selected = candidates.find(({ candidate }) => candidate === wanted)?.block ??
+    candidates.find(({ candidate }) =>
+      candidate && (candidate.startsWith(wanted) || wanted.startsWith(candidate))
+    )?.block ?? "";
   if (!selected) {
     return [];
   }
