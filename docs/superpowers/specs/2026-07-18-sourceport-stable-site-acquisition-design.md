@@ -4,11 +4,11 @@ Date: 2026-07-18
 
 Status: Approved target design
 
-> Current implementation note (2026-07-24): this document defines the target
+> Current implementation note (2026-07-25): this document defines the target
 > architecture and MVP acceptance scope; it is not a current operation
 > inventory. See the repository [README](../../../README.md) for current
 > commands and supported operations, and the
-> [implementation plan](../plans/2026-07-18-sourceport-mvp-implementation.md#execution-status-2026-07-24)
+> [implementation plan](../plans/2026-07-18-sourceport-mvp-implementation.md#execution-status-2026-07-25)
 > for completed and pending tasks.
 
 ## 1. Summary

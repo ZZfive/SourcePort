@@ -8,23 +8,25 @@ This document remains the approved implementation plan and historical task
 breakdown. It is not a restart checklist. The current user-facing capability
 inventory and commands are maintained in the repository [README](../../../README.md).
 
-The initial implementation, explicit freshness cache, and source-health doctor
-are merged on `main`. The bounded car-research consumer milestone is complete
-and verified on `codex/car-research-consumer`, pending merge and push approval.
+The initial implementation, explicit freshness cache, source-health doctor,
+and bounded car-research consumer are merged and pushed on `main`. The
+repository Skill was installed from the published GitHub path and forward
+verified in a fresh Codex task. The implementation baseline before this
+documentation closeout was `a2b1706`.
 
 | Task | Current state | Notes |
 |---|---|---|
 | 1-7 | Implemented | The workspace, contracts, registry, evidence, routing, cache, and CLI exist; some implementation files were consolidated rather than matching every planned path. |
-| 8 | Pending | The reusable adapter-contract/fixture test kit has not been implemented. |
+| 8 | Partially implemented | `@sourceport/testing` provides reusable fake-source support, while a broader adapter-contract/fixture authoring kit remains future work. |
 | 9 | Implemented and live verified | Dongchedi `search-series` is available; its parser tests use sanitized inline source shapes rather than a standalone fixture tree. |
 | 10 | Implemented and live verified | `list-trims`, `get-series`, and `get-owner-reviews` are available through the logged-in browser fallback. |
 | 11 | Implemented and live verified | Exact-trim configuration is available for the bounded BMW X5 validation sample. |
 | 12 | Implemented and live verified | Autohome `list-brand-series` and `get-series-score` are available. |
 | 13 | Implemented and live verified | Health contracts and `sourceport doctor` are merged on `main`. |
-| 14 | Implemented and verified | `@sourceport/car-research`, `sourceport research-cars`, and `skills/research-cars` form the bounded consumer proof. |
+| 14 | Implemented, merged, and forward verified | `@sourceport/car-research`, `sourceport research-cars`, and `skills/research-cars` form the bounded consumer proof on `main`. |
 | 15 | Partially implemented | Consumer fixture E2E, live acceptance, README, and verification records are complete; broader adapter-authoring and security guides remain future documentation work. |
 
-Milestones A-E are implemented on the feature branch. Live-site claims must
+Milestones A-E are implemented on `main`. Live-site claims must
 still be refreshed with bounded probes because authentication, anti-bot state,
 and source shape can change independently of the code.
 
@@ -100,8 +102,9 @@ non-deterministic. For these tasks:
 ## 4. Branch and Commit Strategy
 
 The original implementation began after this plan was reviewed. Its initial
-branch was `codex/sourceport-mvp`; current continuation state is recorded in
-the execution-status section above.
+branch was `codex/sourceport-mvp`; the completed implementation now lives on
+`main`, and current continuation state is recorded in the execution-status
+section above.
 
 - Initial branch: `codex/sourceport-mvp`.
 - Keep each task independently testable.
@@ -851,6 +854,6 @@ operation boundary with the user instead of attempting a fourth patch.
 
 The original plan review gate was satisfied before implementation began. Do
 not restart Task 1 or recreate `codex/sourceport-mvp`. Continue from the
-execution-status table, preserve milestone verification evidence, and treat
-the active cache/doctor branch as unintegrated until it is explicitly merged
-and pushed.
+execution-status table and preserve milestone verification evidence. The
+cache/doctor and car-research work are integrated on `main`; new work must
+start from the current `main` rather than any completed feature branch.

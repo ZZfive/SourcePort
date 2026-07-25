@@ -4,9 +4,9 @@ Date: 2026-07-25
 
 ## Execution Status
 
-Implemented and live verified on `codex/car-research-consumer`. Merge, push,
-and installation from the GitHub `main` path remain intentionally pending user
-approval.
+Implemented and live verified, merged and pushed to `main`, then installed
+from the published GitHub path and forward verified in a fresh Codex task. The
+implementation baseline before this documentation closeout was `a2b1706`.
 
 Delivered:
 
@@ -87,13 +87,13 @@ Each criterion result is `pass`, `fail`, `unknown`, `conflict`, or
 - On-road price is known only when all mandatory cost components have dated,
   applicable evidence; otherwise budget status is `unknown`.
 
-## Verification
+## Verification Gate (Completed)
 
 The implementation must keep all existing tests passing and add coverage for
 the new adapters, health mapping, open criteria, unknown semantics, entity
 resolution, cost ranges, deterministic ordering, CLI behavior, and fixture E2E.
 
-Before merge, run:
+The completed merge gate required:
 
 ```bash
 npm run typecheck
