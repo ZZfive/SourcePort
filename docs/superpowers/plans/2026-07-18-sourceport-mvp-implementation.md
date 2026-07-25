@@ -8,27 +8,23 @@ This document remains the approved implementation plan and historical task
 breakdown. It is not a restart checklist. The current user-facing capability
 inventory and commands are maintained in the repository [README](../../../README.md).
 
-The initial implementation line is present on `main` at `cc1703a`. The active
-branch `codex/sourceport-doctor-cache` contains the following two unmerged and
-unpushed implementation commits; this documentation closeout is being kept on
-the same branch:
-
-- `28be22f feat(core): add explicit freshness cache`;
-- `c8e1ae4 feat(cli): add source health diagnostics`.
+The initial implementation, explicit freshness cache, and source-health doctor
+are merged on `main`. The current continuation is the bounded car-research
+consumer milestone on `codex/car-research-consumer`.
 
 | Task | Current state | Notes |
 |---|---|---|
 | 1-7 | Implemented | The workspace, contracts, registry, evidence, routing, cache, and CLI exist; some implementation files were consolidated rather than matching every planned path. |
 | 8 | Pending | The reusable adapter-contract/fixture test kit has not been implemented. |
 | 9 | Implemented and live verified | Dongchedi `search-series` is available; its parser tests use sanitized inline source shapes rather than a standalone fixture tree. |
-| 10 | Partial | `list-trims` is implemented; `get-series` and `get-owner-reviews` are not. |
+| 10 | Active | `list-trims` is implemented; `get-series` and `get-owner-reviews` are the next source operations. |
 | 11 | Implemented and live verified | Exact-trim configuration is available for the bounded BMW X5 validation sample. |
 | 12 | Implemented and live verified | Autohome `list-brand-series` and `get-series-score` are available. |
-| 13 | Implemented and live verified | Health contracts and `sourceport doctor` are on the active branch. |
-| 14 | Pending | The car-research consumer skill has not been created. |
+| 13 | Implemented and live verified | Health contracts and `sourceport doctor` are merged on `main`. |
+| 14 | Active | The car-research package, CLI, and skill are being implemented as the bounded consumer proof. |
 | 15 | Pending | Consumer end-to-end coverage and the remaining authoring/security/live-testing guides are not complete. |
 
-Milestones A-D are implemented. Milestone E remains pending. Live-site claims
+Milestones A-D are implemented. Milestone E is active. Live-site claims
 must still be refreshed with bounded probes because authentication, anti-bot
 state, and source shape can change independently of the code.
 
