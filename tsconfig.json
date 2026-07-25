@@ -8,6 +8,9 @@
       "path": "./packages/testing"
     },
     {
+      "path": "./packages/car-research"
+    },
+    {
       "path": "./packages/cli"
     },
     {
