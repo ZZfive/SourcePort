@@ -2,6 +2,22 @@
 
 Date: 2026-07-25
 
+## Execution Status
+
+Implemented and live verified on `codex/car-research-consumer`. Merge, push,
+and installation from the GitHub `main` path remain intentionally pending user
+approval.
+
+Delivered:
+
+- `dongchedi.get-series` and `dongchedi.get-owner-reviews`;
+- `@sourceport/car-research` with open criteria, bounded discovery, exact
+  cross-source matching, auditable on-road cost status, exact-trim assistance
+  evaluation, and deterministic ordering;
+- `sourceport research-cars` JSON and Markdown output;
+- the thin repository-owned `skills/research-cars` Skill;
+- fixture end-to-end coverage and a bounded Wuhan live acceptance.
+
 ## Objective
 
 Complete SourcePort's first bounded consumer proof for the query:
@@ -92,3 +108,59 @@ resolve at least three series to exact trims, retrieve at least three exact
 configurations, and cross-check at least two candidates with Autohome or mark
 them explicitly unmatched. Authentication or captcha stops the affected live
 path and reports recovery actions; it is never bypassed.
+
+## Verification Record
+
+Automated verification on 2026-07-25:
+
+- `npm run typecheck`: passed;
+- `npm test`: 31 test files and 143 tests passed;
+- `npm run build`: passed;
+- Skill Creator `quick_validate.py skills/research-cars`: passed.
+
+Live source health:
+
+- Autohome: `healthy`, `available=true`; `list-brand-series` and
+  `get-series-score` were healthy.
+- Dongchedi: `degraded`, `available=true`; public entry points required login,
+  while the connected browser fallback kept all five operations available.
+- The browser `get-owner-reviews` and `list-trims` probes reused the logged-in
+  page for SSR fetches, each completing in about 1.2 seconds in the final
+  doctor run.
+
+Bounded Wuhan live acceptance query:
+
+> Wuhan purchase, on-road price no higher than CNY 150,000, no private charger,
+> driving assistance preferred, SUV preferred but sedan acceptable.
+
+The input seeds were `星越L`, `博越L`, `星瑞`, `风云T9`, and `长安启源Q05`.
+The report returned `partial` with no warnings or recovery actions because the
+hard budget condition correctly remained unresolved, not because a source was
+blocked.
+
+| Measure | Result |
+|---|---:|
+| attempted / validated seeds | 5 / 5 |
+| expanded series | 8 |
+| scanned series | 5 |
+| exact configurations retrieved | 3 |
+| final candidates | 5 |
+| exact Autohome matches | 4 |
+
+Exact matches were `星越L` (`4857` / `6004`), `星瑞` (`3476` / `5273`),
+`博越L` (`6025` / `6814`), and `长安启源Q05` (`25634` / `8241`). `风云T9`
+remained explicitly `unmatched`: Dongchedi classified it under `奇瑞汽车`,
+while Autohome placed it under `奇瑞风云`. The engine did not add an implicit
+brand alias or force the merge.
+
+Every candidate had a budget status and assistance status. Budget was
+`unknown` for all candidates because Wuhan transaction price, purchase tax,
+insurance, and registration evidence was missing. Exact-trim assistance checks
+passed for `星越L` and `星瑞`, failed the requested lane-centering preference
+for the inspected `博越L` trim, and remained unknown where the three-trim
+configuration budget did not reach a candidate. No-private-charger remained a
+context criterion and did not exclude any powertrain.
+
+Coverage remained bounded to the declared seeds, expansion and scan limits,
+Dongchedi and Autohome, and three exact configuration fetches. This verification
+does not establish full-market coverage or a current Wuhan dealer quotation.

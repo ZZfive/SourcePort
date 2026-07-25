@@ -41,12 +41,23 @@ decision engine.
   including OpenCLI configuration, live probe results, and circuit state.
 - Autohome `list-brand-series` and `get-series-score` have passed live
   end-to-end retrieval through SourcePort.
-- Dongchedi `search-series`, `list-trims`, and `get-trim-configuration` have
-  passed live end-to-end retrieval through the logged-in OpenCLI Browser Bridge.
+- Dongchedi `search-series`, `get-series`, `get-owner-reviews`, `list-trims`,
+  and `get-trim-configuration` have passed live end-to-end retrieval through
+  the logged-in OpenCLI Browser Bridge.
   Exact-trim results retain the full configuration sheet and separately model
   claimed assistance level, concrete capabilities, operating domains,
   perception hardware, optional equipment, and unknown system/vendor fields.
-- The car-research consumer is not yet complete.
+- `@sourceport/car-research`, `sourceport research-cars`, and the repository
+  `research-cars` Skill implement a bounded, evidence-preserving consumer flow.
+- A live Wuhan acceptance on 2026-07-25 validated all five requested seeds,
+  scanned five series, retrieved three exact configurations, and matched four
+  candidates exactly with Autohome. All on-road budget decisions correctly
+  remained `unknown` because applicable Wuhan transaction, tax, insurance, and
+  registration evidence was not supplied.
+
+This MVP can be used for bounded car research through the CLI or Skill. It is
+not a full-market catalog, a live dealer-quotation system, or an autonomous
+purchase recommendation engine.
 
 ## Development
 
@@ -120,9 +131,45 @@ SourcePort follows the explicit `switch_backend` recovery to the logged-in
 browser backend. It does not copy cookies into the repository or bypass access
 verification.
 
+## Bounded car research
+
+Build and expose the workspace CLI on `PATH`:
+
+```bash
+npm run build
+npm link --workspace @sourceport/cli
+command -v sourceport
+sourceport doctor
+```
+
+Create a `CarResearchBrief` JSON file and run:
+
+```bash
+sourceport research-cars --input-file brief.json
+sourceport research-cars --input-file brief.json --format md
+```
+
+`--input '<json>'` is also supported, but exactly one of `--input` and
+`--input-file` is required. Research is live by default. A brief may explicitly
+request `prefer-live` or `allow-stale` freshness; the consumer never enables a
+cache read implicitly.
+
+The brief preserves the original query, market, open-ended hard/preference/context
+criteria, at most eight candidate seeds, optional dated cost evidence, and
+bounded execution limits. Unknown criteria are returned in
+`unsupportedCriteria`; missing prices, exact-trim configuration, and
+cross-source identities remain `unknown`, `unmatched`, or `conflict` rather
+than being inferred.
+
+The repository-owned Skill is in [`skills/research-cars`](skills/research-cars/).
+It translates natural language into the brief, runs doctor before research,
+and explains the deterministic report without duplicating filtering, price, or
+sorting logic.
+
 ## Design documents
 
 See:
 
 - [stable site acquisition design](docs/superpowers/specs/2026-07-18-sourceport-stable-site-acquisition-design.md);
-- [MVP implementation plan](docs/superpowers/plans/2026-07-18-sourceport-mvp-implementation.md).
+- [MVP implementation plan](docs/superpowers/plans/2026-07-18-sourceport-mvp-implementation.md);
+- [car-research consumer implementation and verification](docs/superpowers/plans/2026-07-25-car-research-consumer-implementation.md).

@@ -2,37 +2,38 @@
 
 Date: 2026-07-18
 
-## Execution Status (2026-07-24)
+## Execution Status (2026-07-25)
 
 This document remains the approved implementation plan and historical task
 breakdown. It is not a restart checklist. The current user-facing capability
 inventory and commands are maintained in the repository [README](../../../README.md).
 
 The initial implementation, explicit freshness cache, and source-health doctor
-are merged on `main`. The current continuation is the bounded car-research
-consumer milestone on `codex/car-research-consumer`.
+are merged on `main`. The bounded car-research consumer milestone is complete
+and verified on `codex/car-research-consumer`, pending merge and push approval.
 
 | Task | Current state | Notes |
 |---|---|---|
 | 1-7 | Implemented | The workspace, contracts, registry, evidence, routing, cache, and CLI exist; some implementation files were consolidated rather than matching every planned path. |
 | 8 | Pending | The reusable adapter-contract/fixture test kit has not been implemented. |
 | 9 | Implemented and live verified | Dongchedi `search-series` is available; its parser tests use sanitized inline source shapes rather than a standalone fixture tree. |
-| 10 | Active | `list-trims` is implemented; `get-series` and `get-owner-reviews` are the next source operations. |
+| 10 | Implemented and live verified | `list-trims`, `get-series`, and `get-owner-reviews` are available through the logged-in browser fallback. |
 | 11 | Implemented and live verified | Exact-trim configuration is available for the bounded BMW X5 validation sample. |
 | 12 | Implemented and live verified | Autohome `list-brand-series` and `get-series-score` are available. |
 | 13 | Implemented and live verified | Health contracts and `sourceport doctor` are merged on `main`. |
-| 14 | Active | The car-research package, CLI, and skill are being implemented as the bounded consumer proof. |
-| 15 | Pending | Consumer end-to-end coverage and the remaining authoring/security/live-testing guides are not complete. |
+| 14 | Implemented and verified | `@sourceport/car-research`, `sourceport research-cars`, and `skills/research-cars` form the bounded consumer proof. |
+| 15 | Partially implemented | Consumer fixture E2E, live acceptance, README, and verification records are complete; broader adapter-authoring and security guides remain future documentation work. |
 
-Milestones A-D are implemented. Milestone E is active. Live-site claims
-must still be refreshed with bounded probes because authentication, anti-bot
-state, and source shape can change independently of the code.
+Milestones A-E are implemented on the feature branch. Live-site claims must
+still be refreshed with bounded probes because authentication, anti-bot state,
+and source shape can change independently of the code.
 
-The bounded doctor refresh on 2026-07-24 found both Autohome operations
-healthy. Dongchedi remained available but degraded: its public
-`search-series` backend required authentication, while the logged-in browser
-fallback and the `list-trims` and `get-trim-configuration` operations were
-healthy.
+The bounded doctor refresh on 2026-07-25 found both Autohome operations
+healthy. Dongchedi was degraded but available: public operations required a
+logged-in session, while browser fallbacks kept all five operations available.
+The Wuhan acceptance validated five seeds, scanned five series, retrieved three
+exact configurations, and matched four candidates with Autohome. Budget status
+remained unknown because no applicable Wuhan on-road cost evidence was supplied.
 
 ## 1. Objective
 
