@@ -84,10 +84,10 @@ research-cars Codex Skill
 
 ## 当前 MVP 状态
 
-原有买车研究 MVP 位于 `main` 的 `220045e`。通用 decision-context 和
-汽车 context MVP 已在 `codex/decision-context-car-mvp` 实现；本次实现任务
-明确不自动合并、推送，也不替换个人目录中已安装的 Skill。当前测试和实时验证
-证据见[实施状态](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)。
+原有买车研究 MVP，以及通用 decision-context 和汽车 context MVP 均已位于
+`main`。实现提交 `a8d1c5c` 已包含在当前分支中，个人目录中已安装的
+`research-cars` Skill 与仓库副本一致。当前测试和有时点限制的实时验证证据见
+[实施状态](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)。
 
 外部站点可用性具有时效性。实时任务前应运行 `sourceport doctor`；仓库中存在包
 和 fixture 通过，都不能证明当前浏览器会话或公共路径实时可用。

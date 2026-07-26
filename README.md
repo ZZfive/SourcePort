@@ -89,12 +89,12 @@ The repository currently contains:
 
 ## Current MVP status
 
-The original car-research MVP remains on `main` at `220045e`. The general
-decision-context and car-context MVP is implemented on
-`codex/decision-context-car-mvp` and is intentionally not merged, pushed, or
-installed as the personal Skill by this implementation task. Consult the
+The original car-research MVP and the general decision-context and car-context
+MVP are on `main`. Implementation commit `a8d1c5c` is contained in the current
+branch, and the installed personal `research-cars` Skill matches the repository
+copy. Consult the
 [implementation status](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)
-for the current test and live-verification evidence.
+for the current test and point-in-time live-verification evidence.
 
 External-site availability is time-specific. Run `sourceport doctor` before a
 live task; package presence and fixture tests are not proof of a currently
