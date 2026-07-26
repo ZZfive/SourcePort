@@ -1,12 +1,13 @@
 ---
 name: research-cars
-description: Research, filter, and compare purchasable car candidates through SourcePort using bounded Dongchedi and Autohome evidence. Use when a user asks which car to buy, wants candidates under a budget, provides exact configuration or driving-assistance requirements, wants a comparison table, or needs source-backed verification of specific models or trims.
+description: Research, filter, and compare purchasable car candidates through SourcePort using bounded vehicle data, owner experience, official notices, recent company events, and supply-chain context. Use when a user asks which car to buy, wants candidates under a budget, provides exact configuration or driving-assistance requirements, wants a comparison table, asks about recalls or owner feedback, or needs source-backed verification of specific models, trims, manufacturers, or relevant suppliers.
 ---
 
 # Research Cars
 
-Turn a natural-language car-buying request into a bounded `CarResearchBrief`,
-run SourcePort, and explain the evidence without hiding unknowns or conflicts.
+Turn a natural-language car-buying request into one bounded paper-data report
+and one decision-context report. Preserve eligibility and ordering from the car
+report; context flags are advisory and never auto-reject a candidate.
 
 ## Workflow
 
@@ -39,23 +40,44 @@ run SourcePort, and explain the evidence without hiding unknowns or conflicts.
 6. Read [driving-assistance.md](references/driving-assistance.md) whenever the
    request mentions intelligent driving, ADAS, ADS, autonomous driving,
    parking, sensors, chips, subscriptions, or exact trim availability.
-7. Choose one primary output before execution. Use Markdown for a normal
-   user-facing comparison. Use JSON only when programmatic inspection is
-   necessary and the environment can retain the complete output. Write the
-   brief with the available file-edit mechanism, then run exactly once:
+7. Use Markdown for the user-facing comparison and always retain the complete
+   JSON sidecar. Write the brief with the available file-edit mechanism, then
+   run the live car research exactly once:
 
    ```bash
-   sourceport research-cars --input-file <brief.json> --format <md|json>
+   sourceport research-cars --input-file <brief.json> --format md \
+     --report-file <car-report.json>
    ```
 
-   Do not repeat a completed live research solely to switch formats or recover
-   truncated terminal output. Choose Markdown before execution when a full
-   JSON report is likely to exceed the tool's output limit.
-8. Explain candidates in the report's deterministic order. Separate eligible,
-   needs-verification, and rejected candidates. Cite evidence URLs or IDs for
-   decision-relevant claims.
-9. State the bounded coverage and the conditions that could change the result.
-   Never describe the output as a full-market search.
+   Do not repeat live research to switch formats or recover truncated output.
+8. Unless the user explicitly excludes background research, run doctors for
+   `samr`, `brave-search`, `36kr`, and `xiaohongshu`, then collect context only
+   for the final candidates:
+
+   ```bash
+   sourceport car-context collect --report-file <car-report.json> --format md \
+     --corpus-file <context-corpus.json>
+   ```
+
+   Continue with a partial corpus. Xiaohongshu login or browser failure must
+   not erase official, media, discovery, or reused Dongchedi evidence.
+9. Read [decision-context.md](references/decision-context.md). Use the compact
+   corpus Markdown to create `<assessment.json>`. Every event, owner signal,
+   conflict, and unknown must cite document and evidence IDs present in the
+   corpus. Then run deterministic compilation:
+
+   ```bash
+   sourceport context compile --corpus-file <context-corpus.json> \
+     --assessment-file <assessment.json> --format md \
+     --report-file <context-report.json>
+   ```
+10. Explain candidates in the car report's deterministic order. Pair each
+    candidate with owner signals, events, advisory flags, source failures, and
+    unknowns. Do not reorder or change `eligible`, `needs-verification`, or
+    `rejected` from context evidence.
+11. State bounded coverage, sample bias, failed sources, and the evidence that
+    could change the conclusion. Never describe the output as full-market or
+    comprehensive web coverage.
 
 ## Interpretation Rules
 
@@ -67,6 +89,10 @@ run SourcePort, and explain the evidence without hiding unknowns or conflicts.
   price. Treat the budget result as unknown unless all mandatory cost evidence
   is dated and applicable.
 - Do not replace the report's ordering with a hidden score.
+- Do not create a sentiment or public-opinion score. Search heat, one complaint,
+  or an unrelated supplier event is not a vehicle risk verdict.
+- Treat `context-only`, `watch`, `verify-before-buy`, and `pause` as prompts for
+  follow-up, not automatic eligibility changes.
 - Do not bypass authentication, captcha, access verification, or rate limits.
   Ask the user to complete the reported recovery step and rerun the command.
 
@@ -80,4 +106,8 @@ Present:
 - a separate driving-assistance matrix;
 - on-road cost status and missing components;
 - cross-source match status;
+- owner-experience signals and their recurrence level;
+- recent events, recalls/remediation, supplier applicability, and advisory
+  decision flags;
+- conflicts and unknowns that could change the decision;
 - evidence, warnings, recovery actions, and coverage limitations.

@@ -10,9 +10,14 @@
   },
   "dependencies": {
     "@sourceport/autohome": "*",
+    "@sourceport/brave-search": "*",
     "@sourceport/car-research": "*",
     "@sourceport/core": "*",
-    "@sourceport/dongchedi": "*"
+    "@sourceport/decision-context": "*",
+    "@sourceport/dongchedi": "*",
+    "@sourceport/kr36": "*",
+    "@sourceport/samr": "*",
+    "@sourceport/xiaohongshu": "*"
   },
   "devDependencies": {
     "@sourceport/testing": "*"

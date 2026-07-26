@@ -25,8 +25,9 @@ SourcePort is an information-access layer. It owns:
 
 SourcePort does not make domain decisions in its core. Cross-source filtering,
 ranking, recommendation, and decision-making belong to consumer packages or
-skills. The first validation consumer is bounded car research using Dongchedi
-and Autohome.
+skills. Car research is the first validation consumer. The reusable
+`decision-context` consumer adds bounded owner, event, recall, remediation, and
+supply-chain evidence without leaking those concepts into core.
 
 ## Architecture
 
@@ -36,14 +37,23 @@ Natural-language request
         v
 research-cars Codex Skill
         |
-        v
-CarResearchBrief
-        |
-        v
-@sourceport/car-research
-        |
-        v
-@sourceport/core
+        +--> CarResearchBrief --> @sourceport/car-research
+        |                         |
+        |                         v
+        |                    CarResearchReport
+        |                         |
+        +--> buildCarDecisionContextBrief
+                                  |
+                                  v
+                       @sourceport/decision-context
+                         | collect evidence corpus
+                         | validate assessment
+                         | derive advisory flags
+                                  |
+                                  v
+                       DecisionContextReport
+
+Both consumers use @sourceport/core
   | registry and versioned contracts
   | router, fallback, circuit breaker
   | freshness cache and doctor
@@ -54,11 +64,10 @@ CarResearchBrief
   |      +--> manual recovery guidance
   |
   +--> @sourceport/autohome
-         +--> public HTTP
-         +--> manual recovery guidance
-        |
-        v
-CarResearchReport: JSON or Markdown
+  +--> @sourceport/samr
+  +--> @sourceport/brave-search
+  +--> @sourceport/kr36
+  +--> @sourceport/xiaohongshu
 ~~~
 
 The repository currently contains:
@@ -68,35 +77,50 @@ The repository currently contains:
 | <code>@sourceport/core</code> | Contracts, evidence, registry, routing, cache, failures, and doctor |
 | <code>@sourceport/cli</code> | Source discovery, operation execution, doctor, and car-research CLI |
 | <code>@sourceport/car-research</code> | Bounded cross-source car research and deterministic reporting |
+| <code>@sourceport/decision-context</code> | Cross-domain evidence corpus, source admission, assessment validation, and advisory flags |
 | <code>@sourceport/dongchedi</code> | Dongchedi search, series, review, trim, and configuration acquisition |
 | <code>@sourceport/autohome</code> | Autohome brand catalog, score, reliability, and competitor acquisition |
+| <code>@sourceport/samr</code> | Official notice search and detail acquisition |
+| <code>@sourceport/brave-search</code> | API-or-browser discovery leads |
+| <code>@sourceport/kr36</code> | 36kr article search and detail acquisition |
+| <code>@sourceport/xiaohongshu</code> | Bounded note and top-level comment acquisition |
 | <code>@sourceport/testing</code> | Test fixtures and helpers |
 | <code>skills/research-cars</code> | Thin Codex orchestration skill for natural-language car research |
 
 ## Current MVP status
 
-The car-research functional MVP is complete. It has been merged into and pushed
-to <code>main</code>, the repository Skill has been installed and forward
-tested, and the full flow can be used through either the CLI or the Codex Skill.
+The original car-research MVP remains on `main` at `220045e`. The general
+decision-context and car-context MVP is implemented on
+`codex/decision-context-car-mvp` and is intentionally not merged, pushed, or
+installed as the personal Skill by this implementation task. Consult the
+[implementation status](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)
+for the current test and live-verification evidence.
 
-Functional baseline verified on 2026-07-25 before this documentation
-closeout:
+External-site availability is time-specific. Run `sourceport doctor` before a
+live task; package presence and fixture tests are not proof of a currently
+usable browser session or public route.
 
-- the implementation baseline on <code>main</code> and
-  <code>origin/main</code> was <code>a2b1706</code>, with no uncommitted
-  implementation files;
-- 31 test files and 143 tests passed;
-- <code>npm run typecheck</code> and <code>npm run build</code> passed;
-- the linked CLI was available as <code>/opt/homebrew/bin/sourceport</code>;
-- the installed <code>research-cars</code> Skill matched the repository copy;
-- OpenCLI 1.8.6 reported a running daemon and a connected Chrome extension;
-- Autohome was <code>healthy, available=true</code>;
-- Dongchedi was <code>degraded, available=true</code>: several public entry
-  points required authentication, while the logged-in browser fallback kept
-  all five registered operations usable.
+Current branch verification on 2026-07-26:
 
-This is a point-in-time verification, not a permanent promise about external
-sites. Run <code>sourceport doctor</code> before a live research task.
+- 40 test files and 171 tests passed; typecheck and build passed;
+- Brave Search was healthy through the browser fallback with no API key;
+- 36kr search and article detail were healthy;
+- SAMR was degraded but available: browser search fallback and public notice
+  detail were usable;
+- Xiaohongshu was degraded and unavailable in the current browser session, with
+  explicit human-verification/reconfiguration recovery;
+- a bounded live collect retained SAMR, Brave, and 36kr evidence while
+  Xiaohongshu was blocked, and deterministic compile derived an advisory
+  `pause` for a directly applicable official P7+ recall.
+- a separate fresh-task Skill forward validation kept two paper candidates in
+  their original order and compiled a 32-document partial corpus. Because the
+  selected SAMR detail body was unavailable in that run, the P7+ recall stayed
+  `context-only`; an AION S battery event stayed `watch` because the selected
+  trim and affected historical batch relationship was not established.
+
+The different P7+ flags are intentional evidence-sensitive behavior: official
+detail evidence can satisfy the `pause` gate, while discovery leads alone must
+remain `unverified` and cannot do so.
 
 ### Supported source operations
 
@@ -109,6 +133,14 @@ sites. Run <code>sourceport doctor</code> before a live research task.
 | Dongchedi | <code>get-owner-reviews</code> | Get a bounded set of owner reviews and evidence URLs | Logged-in browser fallback available |
 | Dongchedi | <code>list-trims</code> | List exact on-sale or discontinued trims | Logged-in browser, healthy |
 | Dongchedi | <code>get-trim-configuration</code> | Get the full exact-trim configuration and driving-assistance evidence | Logged-in browser, healthy |
+| SAMR | <code>search-notices</code> | Search official recall, penalty, and quality/safety notices | Browser fallback available; static search drifted |
+| SAMR | <code>get-notice</code> | Retrieve official body, publication date, scope, and attachments | Public HTTP available |
+| Brave Search | <code>search</code> | Return discovery leads; never event confirmation by itself | Browser healthy; API optional |
+| 36kr | <code>search-articles</code> | Search bounded industry/company event articles | OpenCLI browser healthy |
+| 36kr | <code>get-article</code> | Retrieve one supported article body | OpenCLI browser healthy |
+| Xiaohongshu | <code>search-notes</code> | Search a bounded community sample | Current session unavailable; recovery required |
+| Xiaohongshu | <code>get-note</code> | Retrieve one note | Requires a valid signed note URL/session |
+| Xiaohongshu | <code>get-comments</code> | Retrieve bounded top-level comments | Requires a valid signed note URL/session |
 
 Exact-trim driving-assistance output keeps claimed automation level, concrete
 capabilities, operating domains, perception hardware, system/version,
@@ -124,8 +156,11 @@ market applicability separate. It does not use a universal
 - npm;
 - Chrome plus the
   [OpenCLI extension](https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk)
-  for Dongchedi browser-backed operations;
-- a logged-in Dongchedi session when the public route requires authentication.
+  for browser-backed operations;
+- logged-in Dongchedi and Xiaohongshu sessions when those operations require
+  authentication;
+- optional `BRAVE_SEARCH_API_KEY`; without it Brave uses the registered
+  OpenCLI browser backend.
 
 The packages are currently private workspace packages rather than a public npm
 release. Build and link the CLI from this repository:
@@ -164,6 +199,10 @@ Inspect the authoritative parameter and output schemas:
 ~~~bash
 sourceport capabilities autohome
 sourceport capabilities dongchedi
+sourceport capabilities samr
+sourceport capabilities brave-search
+sourceport capabilities 36kr
+sourceport capabilities xiaohongshu
 ~~~
 
 Run bounded, read-only live probes:
@@ -172,6 +211,10 @@ Run bounded, read-only live probes:
 sourceport doctor
 sourceport doctor autohome
 sourceport doctor dongchedi
+sourceport doctor samr
+sourceport doctor brave-search
+sourceport doctor 36kr
+sourceport doctor xiaohongshu
 sourceport doctor dongchedi --json --timeout-ms 15000
 ~~~
 
@@ -229,6 +272,22 @@ sourceport run dongchedi list-trims \
 
 sourceport run dongchedi get-trim-configuration \
   --input '{"trimId":"255925"}'
+~~~
+
+Decision-context sources:
+
+~~~bash
+sourceport run samr search-notices \
+  --input '{"query":"某汽车 召回 质量","categories":["recall","quality-safety"],"limit":5}'
+
+sourceport run brave-search search \
+  --input '{"query":"某汽车 召回 供应链","limit":5,"country":"CN","language":"zh-hans"}'
+
+sourceport run 36kr search-articles \
+  --input '{"query":"某汽车公司 召回 处罚","limit":5}'
+
+sourceport run xiaohongshu search-notes \
+  --input '{"query":"某车型 真实车主 用车","limit":2}'
 ~~~
 
 Each result preserves its source, operation, schema version, backend, status,
@@ -290,10 +349,11 @@ Prefer an SUV, but a sedan is acceptable. Return no more than five candidates
 and list everything that still needs verification.
 ~~~
 
-The Skill checks the CLI and both source doctors, translates the request into a
-bounded <code>CarResearchBrief</code>, executes one primary Markdown or JSON
-research run, and explains the deterministic report without replacing unknowns
-or conflicts with guesses.
+The Skill runs the paper-data research once with a complete JSON sidecar, then
+collects decision context only for the final candidates. It uses the compact
+corpus to prepare a cited assessment and lets the deterministic compiler enforce
+source admission, owner-signal thresholds, supplier applicability, and advisory
+flags.
 
 ### CLI use
 
@@ -355,11 +415,11 @@ Create <code>brief.json</code>:
 }
 ~~~
 
-Run one primary output format:
+Run one live paper-data research and keep its complete sidecar:
 
 ~~~bash
-sourceport research-cars --input-file brief.json --format md
-sourceport research-cars --input-file brief.json --format json
+sourceport research-cars --input-file brief.json --format md \
+  --report-file car-report.json
 ~~~
 
 Inline JSON is also supported:
@@ -379,6 +439,55 @@ Research is live by default. A brief may explicitly include:
   }
 }
 ~~~
+
+### Decision context workflow
+
+The car convenience command builds a generic `DecisionContextBrief` from at
+most five final, non-rejected candidates. It creates series, exact-trim, and
+manufacturer subjects; it adds battery, cell, or driving-assistance suppliers
+only when exact-configuration evidence names them. Existing Dongchedi owner
+reviews become seed documents and are not fetched again.
+
+~~~bash
+sourceport car-context collect --report-file car-report.json --format md \
+  --corpus-file context-corpus.json
+
+sourceport context compile --corpus-file context-corpus.json \
+  --assessment-file assessment.json --format md \
+  --report-file context-report.json
+~~~
+
+`context collect` is the domain-neutral entry point for future consumers:
+
+~~~bash
+sourceport context collect --input-file context-brief.json --format md \
+  --corpus-file context-corpus.json
+~~~
+
+Collection only retrieves, normalizes, deduplicates, and records evidence. It
+does not assign severity or recommendations. The assessment must cite corpus
+document/evidence IDs; compilation rejects invalid references and unsupported
+claims.
+
+Source admission and flags:
+
+- Brave snippets are discovery leads and cannot confirm events alone;
+- official evidence can confirm recalls, penalties, batches, and remediation;
+- `repeated` owner signals need three distinct items or authors;
+  `cross-source` also needs two source families;
+- supplier risk is direct only with an evidenced exact series/trim/batch
+  relation;
+- unknown dates remain `date unknown`, not “recent”;
+- `context-only`, `watch`, `verify-before-buy`, and `pause` are advisory and do
+  not change car eligibility or ordering;
+- `pause` requires direct high/critical unresolved scope with official or
+  independently cross-verified support.
+
+Default context windows are 365 days for recent events and 1095 days for
+recalls or recurring quality history. Hard limits are 24 source queries, 8
+results per query, 20 documents per subject, 80 documents total, 30 detail
+calls, and 10 top-level comments per note. Xiaohongshu is additionally limited
+to two notes per candidate.
 
 ### Criteria and decision semantics
 
@@ -480,6 +589,11 @@ Research CLI exit codes:
 | 2 | Invalid CLI input or invalid <code>CarResearchBrief</code> |
 | 3 | Required acquisition was blocked by login or captcha |
 
+The context commands use the same convention. Exit `2` also covers invalid
+corpus/assessment references. Exit `3` means all required automatic context
+paths are blocked by a human step; optional-source failures produce a partial
+corpus instead.
+
 ## Verified Wuhan acceptance
 
 The bounded Wuhan acceptance on 2026-07-25 used the decision boundary:
@@ -506,6 +620,9 @@ SourcePort can now be used directly for:
 - owner-review retrieval;
 - Autohome cross-checking;
 - deterministic condition evaluation and candidate tables;
+- bounded official-notice, media, discovery, and community evidence collection;
+- deterministic source admission, recurrence checks, supplier applicability,
+  conflicts, unknowns, and advisory context flags;
 - evidence-preserving reports with explicit unknowns and recovery actions.
 
 It is not:
@@ -514,8 +631,11 @@ It is not:
 - a live Wuhan dealer-quotation, inventory, or delivery-time system;
 - a guarantee that a vehicle can be purchased within a stated on-road budget;
 - an autonomous purchase decision or transaction engine;
-- an adapter for Yiche, 58.com, Xiaohongshu, Beike, Ziroom, or other not-yet
-  registered sources.
+- an arbitrary-URL public web reader or general crawler;
+- a housing decision-context domain pack (the generic contracts are reusable,
+  but housing queries and interpretation are not implemented in this MVP);
+- an adapter for Yiche, 58.com, Beike, Ziroom, or other not-yet registered
+  sources.
 
 The highest-value next capability for car research is applicable transaction
 evidence: local dealer prices, tax rules, insurance, registration, mandatory
@@ -534,6 +654,10 @@ Live checks:
 ~~~bash
 sourceport doctor autohome --json
 sourceport doctor dongchedi --json
+sourceport doctor samr --json
+sourceport doctor brave-search --json
+sourceport doctor 36kr --json
+sourceport doctor xiaohongshu --json
 ~~~
 
 Do not commit caches, cookies, tokens, browser profiles, captcha artifacts, or
@@ -545,5 +669,7 @@ private raw pages.
 - [Stable site acquisition design](docs/superpowers/specs/2026-07-18-sourceport-stable-site-acquisition-design.md)
 - [MVP implementation plan](docs/superpowers/plans/2026-07-18-sourceport-mvp-implementation.md)
 - [Car-research implementation and verification](docs/superpowers/plans/2026-07-25-car-research-consumer-implementation.md)
+- [Decision-context design](docs/superpowers/specs/2026-07-26-decision-context-design.md)
+- [Decision-context car MVP implementation status](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)
 - [research-cars Skill](skills/research-cars/SKILL.md)
 - [简体中文 README](README_zh.md)

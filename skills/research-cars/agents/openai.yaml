@@ -1,4 +1,4 @@
 interface:
   display_name: "Research Cars"
-  short_description: "Run bounded, evidence-backed car research"
-  default_prompt: "Use $research-cars to research and compare cars against my budget and exact requirements."
+  short_description: "Compare cars with evidence and decision context"
+  default_prompt: "Use $research-cars to compare cars, verify exact trims, and assess owner feedback, recalls, and recent risk context."

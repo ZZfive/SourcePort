@@ -17,10 +17,25 @@
       "path": "../car-research"
     },
     {
+      "path": "../decision-context"
+    },
+    {
       "path": "../../sources/dongchedi"
     },
     {
       "path": "../../sources/autohome"
+    },
+    {
+      "path": "../../sources/brave-search"
+    },
+    {
+      "path": "../../sources/kr36"
+    },
+    {
+      "path": "../../sources/samr"
+    },
+    {
+      "path": "../../sources/xiaohongshu"
     }
   ],
   "include": [

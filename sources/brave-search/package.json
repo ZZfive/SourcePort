@@ -1,5 +1,5 @@
 {
-  "name": "@sourceport/car-research",
+  "name": "@sourceport/brave-search",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,6 @@
     }
   },
   "dependencies": {
-    "@sourceport/core": "*",
-    "@sourceport/decision-context": "*"
+    "@sourceport/core": "*"
   }
 }

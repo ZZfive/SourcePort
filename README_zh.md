@@ -21,7 +21,8 @@ SourcePort 是信息获取基础设施，负责：
 - 提供 fixture、契约测试、受限实时探测和恢复动作。
 
 SourcePort core 不负责领域决策。跨来源筛选、排序、推荐和决策属于消费者包或
-Skill。第一个验证消费者是基于懂车帝和汽车之家的有界买车研究。
+Skill。买车研究是第一个验证消费者；可复用的 `decision-context` 消费者负责
+有界车主体验、事件、召回、整改和供应链证据，但不会把这些概念泄漏进 core。
 
 ## 架构
 
@@ -31,14 +32,23 @@ Skill。第一个验证消费者是基于懂车帝和汽车之家的有界买车
       v
 research-cars Codex Skill
       |
-      v
-CarResearchBrief
-      |
-      v
-@sourceport/car-research
-      |
-      v
-@sourceport/core
+      +--> CarResearchBrief --> @sourceport/car-research
+      |                         |
+      |                         v
+      |                    CarResearchReport
+      |                         |
+      +--> buildCarDecisionContextBrief
+                                |
+                                v
+                     @sourceport/decision-context
+                       | 收集证据语料
+                       | 校验 assessment
+                       | 派生提示旗标
+                                |
+                                v
+                     DecisionContextReport
+
+两个消费者共同使用 @sourceport/core
   | 能力注册和带版本合同
   | 路由、fallback、circuit breaker
   | freshness 缓存和 doctor
@@ -49,11 +59,10 @@ CarResearchBrief
   |      +--> 人工恢复指引
   |
   +--> @sourceport/autohome
-         +--> 公共 HTTP
-         +--> 人工恢复指引
-      |
-      v
-CarResearchReport：JSON 或 Markdown
+  +--> @sourceport/samr
+  +--> @sourceport/brave-search
+  +--> @sourceport/kr36
+  +--> @sourceport/xiaohongshu
 ~~~
 
 仓库当前包含：
@@ -63,32 +72,42 @@ CarResearchReport：JSON 或 Markdown
 | <code>@sourceport/core</code> | 合同、证据、注册表、路由、缓存、失败分类和 doctor |
 | <code>@sourceport/cli</code> | 来源发现、operation 执行、doctor 和买车研究 CLI |
 | <code>@sourceport/car-research</code> | 有界跨来源买车研究和确定性报告 |
+| <code>@sourceport/decision-context</code> | 跨领域证据语料、来源准入、assessment 校验和提示旗标 |
 | <code>@sourceport/dongchedi</code> | 懂车帝搜索、车系、评价、款型和配置获取 |
 | <code>@sourceport/autohome</code> | 汽车之家品牌目录、评分、可靠性和竞品获取 |
+| <code>@sourceport/samr</code> | 官方通知搜索和正文获取 |
+| <code>@sourceport/brave-search</code> | API 或浏览器 discovery 线索 |
+| <code>@sourceport/kr36</code> | 36氪文章搜索和正文获取 |
+| <code>@sourceport/xiaohongshu</code> | 有界笔记和顶层评论获取 |
 | <code>@sourceport/testing</code> | 测试 fixture 和辅助工具 |
 | <code>skills/research-cars</code> | 将自然语言买车需求编排到 SourcePort 的薄层 Codex Skill |
 
 ## 当前 MVP 状态
 
-买车研究功能 MVP 已经完成，相关实现已合入并推送到
-<code>main</code>，仓库 Skill 已完成安装和前向验证。现在可以通过 CLI 或
-Codex Skill 直接执行完整的有界买车研究。
+原有买车研究 MVP 位于 `main` 的 `220045e`。通用 decision-context 和
+汽车 context MVP 已在 `codex/decision-context-car-mvp` 实现；本次实现任务
+明确不自动合并、推送，也不替换个人目录中已安装的 Skill。当前测试和实时验证
+证据见[实施状态](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)。
 
-本次文档收尾前在 2026-07-25 验证的功能基线：
+外部站点可用性具有时效性。实时任务前应运行 `sourceport doctor`；仓库中存在包
+和 fixture 通过，都不能证明当前浏览器会话或公共路径实时可用。
 
-- <code>main</code> 与 <code>origin/main</code> 的实现基线为
-  <code>a2b1706</code>，当时不存在未提交的实现文件；
-- 31 个测试文件、143 个测试全部通过；
-- <code>npm run typecheck</code> 和 <code>npm run build</code> 通过；
-- CLI 已链接到 <code>/opt/homebrew/bin/sourceport</code>；
-- 已安装的 <code>research-cars</code> Skill 与仓库源码一致；
-- OpenCLI 1.8.6 的 daemon 正常运行，Chrome Extension 已连接；
-- 汽车之家为 <code>healthy, available=true</code>；
-- 懂车帝为 <code>degraded, available=true</code>：部分公共入口要求登录，
-  但已登录浏览器 fallback 保持五个 operation 全部可用。
+2026-07-26 当前分支验证：
 
-这是一个特定时间点的验证结果，不是对外部网站永久可用性的保证。执行实时研究
-前应先运行 <code>sourceport doctor</code>。
+- 40 个测试文件、171 个测试全部通过，typecheck 和 build 通过；
+- Brave Search 在无 API 密钥时通过浏览器 fallback healthy；
+- 36氪搜索和正文详情 healthy；
+- 市场监管总局 degraded 但 available，浏览器搜索 fallback 和公共正文可用；
+- 小红书在当前浏览器会话 degraded 且 unavailable，并返回明确的人工验证或重连恢复动作；
+- 一次有界 live collect 在小红书被阻断时仍保留 SAMR、Brave 和 36氪证据；
+  确定性 compile 对直接适用的官方小鹏P7+召回派生了提示性 `pause`。
+- 另一次全新任务中的 Skill 前向验证保持了两个纸面候选及原排序，并成功编译
+  32 篇文档的 partial corpus。由于该次运行未能取得所选 SAMR 公告正文，P7+
+  召回保持为 `context-only`；AION S 电池事件因所选配置与历史受影响批次关系未
+  得到证实，保持为 `watch`。
+
+两次 P7+ 旗标不同是预期的证据敏感行为：官方正文可以满足 `pause` 门槛，仅有
+discovery 线索时必须保持 `unverified`，不能派生 `pause`。
 
 ### 已支持的来源 operation
 
@@ -101,6 +120,14 @@ Codex Skill 直接执行完整的有界买车研究。
 | 懂车帝 | <code>get-owner-reviews</code> | 获取受限数量的车主评价和证据 URL | 已登录浏览器 fallback 可用 |
 | 懂车帝 | <code>list-trims</code> | 列出精确的在售或停售款型 | 已登录浏览器，healthy |
 | 懂车帝 | <code>get-trim-configuration</code> | 获取完整精确款型配置和辅助驾驶证据 | 已登录浏览器，healthy |
+| 市场监管总局 | <code>search-notices</code> | 搜索召回、处罚和质量安全官方通知 | 浏览器 fallback 可用；静态搜索已漂移 |
+| 市场监管总局 | <code>get-notice</code> | 获取官方正文、发布日期、范围和附件 | 公共 HTTP 可用 |
+| Brave Search | <code>search</code> | 返回 discovery 线索，不能单独确认事件 | 浏览器 healthy；API 可选 |
+| 36氪 | <code>search-articles</code> | 搜索有界行业和企业事件文章 | OpenCLI 浏览器 healthy |
+| 36氪 | <code>get-article</code> | 获取一篇受支持文章正文 | OpenCLI 浏览器 healthy |
+| 小红书 | <code>search-notes</code> | 搜索有界社区样本 | 当前会话不可用，需要恢复 |
+| 小红书 | <code>get-note</code> | 获取一篇笔记 | 需要有效签名 URL 和会话 |
+| 小红书 | <code>get-comments</code> | 获取受限顶层评论 | 需要有效签名 URL 和会话 |
 
 精确款型辅助驾驶输出会分别保留：
 
@@ -122,9 +149,10 @@ Codex Skill 直接执行完整的有界买车研究。
 
 - Node.js 20 或更高版本；
 - npm；
-- 懂车帝浏览器后端需要 Chrome 和
+- 浏览器后端需要 Chrome 和
   [OpenCLI Extension](https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk)；
-- 当懂车帝公共路径要求认证时，需要保持已登录的懂车帝浏览器会话。
+- 当懂车帝或小红书要求认证时，需要保持对应的已登录浏览器会话；
+- `BRAVE_SEARCH_API_KEY` 可选；未配置时 Brave 使用已注册的 OpenCLI 浏览器后端。
 
 当前各包是私有 workspace 包，尚未作为公共 npm 包发布。需要从本仓库构建并
 链接 CLI：
@@ -162,6 +190,10 @@ sourceport sources
 ~~~bash
 sourceport capabilities autohome
 sourceport capabilities dongchedi
+sourceport capabilities samr
+sourceport capabilities brave-search
+sourceport capabilities 36kr
+sourceport capabilities xiaohongshu
 ~~~
 
 执行受限、只读的实时健康探测：
@@ -170,6 +202,10 @@ sourceport capabilities dongchedi
 sourceport doctor
 sourceport doctor autohome
 sourceport doctor dongchedi
+sourceport doctor samr
+sourceport doctor brave-search
+sourceport doctor 36kr
+sourceport doctor xiaohongshu
 sourceport doctor dongchedi --json --timeout-ms 15000
 ~~~
 
@@ -227,6 +263,22 @@ sourceport run dongchedi list-trims \
 
 sourceport run dongchedi get-trim-configuration \
   --input '{"trimId":"255925"}'
+~~~
+
+决策背景来源：
+
+~~~bash
+sourceport run samr search-notices \
+  --input '{"query":"某汽车 召回 质量","categories":["recall","quality-safety"],"limit":5}'
+
+sourceport run brave-search search \
+  --input '{"query":"某汽车 召回 供应链","limit":5,"country":"CN","language":"zh-hans"}'
+
+sourceport run 36kr search-articles \
+  --input '{"query":"某汽车公司 召回 处罚","limit":5}'
+
+sourceport run xiaohongshu search-notes \
+  --input '{"query":"某车型 真实车主 用车","limit":2}'
 ~~~
 
 每个结果都会保留：
@@ -291,16 +343,9 @@ sourceport run autohome get-series-score \
 SUV优先，但轿车也可以。请给出不超过5个候选，并列出所有仍需核实的问题。
 ~~~
 
-Skill 会：
-
-1. 检查 CLI 和两个来源的 doctor；
-2. 把自然语言转换为有界的 <code>CarResearchBrief</code>；
-3. 区分 hard、preference 和 context；
-4. 生成有限数量的待验证车型种子；
-5. 选择一个主要 Markdown 或 JSON 输出并执行一次研究；
-6. 按确定性报告解释结果；
-7. 保留所有 unknown、conflict 和 unsupported；
-8. 遇到登录或验证码时暂停并提供恢复动作。
+Skill 会先执行一次纸面数据研究并保存完整 JSON sidecar，再只针对最终候选收集
+决策背景。它使用紧凑 corpus 生成带引用的 assessment，并由确定性编译器执行
+来源准入、车主信号阈值、供应商适用性和提示旗标校验。
 
 ### CLI 使用
 
@@ -362,12 +407,55 @@ Skill 会：
 }
 ~~~
 
-选择一种主要输出格式执行：
+执行一次实时纸面研究并保留完整 sidecar：
 
 ~~~bash
-sourceport research-cars --input-file brief.json --format md
-sourceport research-cars --input-file brief.json --format json
+sourceport research-cars --input-file brief.json --format md \
+  --report-file car-report.json
 ~~~
+
+### 决策背景工作流
+
+汽车便捷命令只从最多五个最终、非 rejected 候选生成通用
+`DecisionContextBrief`。它会建立车系、精确款型和制造商实体；只有精确配置证据
+明确给出电池、电芯或辅助驾驶供应商时，才增加供应商实体。汽车报告已有的懂车帝
+车主评价会作为 seed document 复用，不会再次实时获取。
+
+~~~bash
+sourceport car-context collect --report-file car-report.json --format md \
+  --corpus-file context-corpus.json
+
+sourceport context compile --corpus-file context-corpus.json \
+  --assessment-file assessment.json --format md \
+  --report-file context-report.json
+~~~
+
+`context collect` 是未来其他领域消费者可复用的通用入口：
+
+~~~bash
+sourceport context collect --input-file context-brief.json --format md \
+  --corpus-file context-corpus.json
+~~~
+
+collect 只获取、规范化、去重和记录证据，不生成严重度或推荐。assessment 中每项
+都必须引用 corpus 内存在的 document/evidence ID；compile 会拒绝无效引用和
+不符合来源准入的结论。
+
+来源准入和旗标规则：
+
+- Brave 摘要只是 discovery lead，不能单独确认事件；
+- 官方证据可以确认召回、处罚、批次和整改；
+- `repeated` 车主信号至少需要三个不同内容项或作者，`cross-source` 还需要两个
+  来源系列；
+- 供应商风险只有在证据连接到精确车系、款型或批次时才是 `direct`；
+- 未知日期保持 `date unknown`，不能称为“最近”；
+- `context-only`、`watch`、`verify-before-buy`、`pause` 只是提示，不修改车型
+  eligibility 或排序；
+- `pause` 仅在直接适用、高或严重、整改未完成，且有官方或独立交叉验证支持时产生。
+
+默认窗口为近况 365 天、召回和反复质量问题 1095 天。硬上限为 24 个 source
+query、每 query 8 条、每 subject 20 个文档、全局 80 个文档、30 次正文调用、
+每篇 10 条顶层评论；小红书每候选额外限制为两篇笔记。
 
 也支持内联 JSON：
 
@@ -482,6 +570,10 @@ pass | fail | unknown | conflict | unsupported
 | 2 | CLI 参数或 <code>CarResearchBrief</code> 无效 |
 | 3 | 必需的获取流程被登录或验证码阻断 |
 
+context 命令沿用同一退出码。退出码 `2` 也表示 corpus/assessment 引用无效；
+退出码 `3` 表示所有必需自动背景获取路径都被人工步骤阻断。可选来源失败只产生
+partial corpus。
+
 ## 已验证的武汉验收
 
 2026-07-25 的武汉有界验收使用了以下决策边界：
@@ -513,6 +605,8 @@ SourcePort 当前可以直接用于：
 - 获取车主评价；
 - 使用汽车之家交叉验证；
 - 执行确定性条件判断并生成候选表；
+- 收集有界官方通知、媒体、discovery 和社区证据；
+- 确定性执行来源准入、重复信号、供应商适用性、冲突、未知项和提示旗标；
 - 输出保留 unknown 和恢复动作的证据报告。
 
 它不是：
@@ -521,7 +615,9 @@ SourcePort 当前可以直接用于：
 - 武汉实时经销商报价、库存或交付周期系统；
 - 对某辆车必然可以在指定预算内落地的保证；
 - 自动替用户做最终交易决策的引擎；
-- 易车、58同城、小红书、贝壳、自如等尚未注册来源的适配器。
+- 任意 URL 公共网页读取器或通用爬虫；
+- 买房 decision-context domain pack；通用合同可复用，但本 MVP 未实现房产查询和解释；
+- 易车、58同城、贝壳、自如等尚未注册来源的适配器。
 
 对于买车研究，下一项价值最高的能力是交易层证据：本地经销商成交价、税费规则、
 保险、上牌、必要费用、库存和交付条件。
@@ -539,6 +635,10 @@ npm run build
 ~~~bash
 sourceport doctor autohome --json
 sourceport doctor dongchedi --json
+sourceport doctor samr --json
+sourceport doctor brave-search --json
+sourceport doctor 36kr --json
+sourceport doctor xiaohongshu --json
 ~~~
 
 不要提交缓存、Cookie、Token、浏览器 Profile、验证码产物或私有原始页面。
@@ -549,5 +649,7 @@ sourceport doctor dongchedi --json
 - [稳定站点获取设计](docs/superpowers/specs/2026-07-18-sourceport-stable-site-acquisition-design.md)
 - [MVP 实施计划](docs/superpowers/plans/2026-07-18-sourceport-mvp-implementation.md)
 - [买车研究实施与验收](docs/superpowers/plans/2026-07-25-car-research-consumer-implementation.md)
+- [决策背景设计](docs/superpowers/specs/2026-07-26-decision-context-design.md)
+- [决策背景汽车 MVP 实施状态](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)
 - [research-cars Skill](skills/research-cars/SKILL.md)
 - [English README](README.md)

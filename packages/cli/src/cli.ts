@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import { AutohomeAdapter } from "@sourceport/autohome";
+import { BraveSearchAdapter } from "@sourceport/brave-search";
 import {
+  buildCarDecisionContextBrief,
   createRegistrySourceExecutor,
   renderCarResearchMarkdown,
   researchCars,
@@ -13,6 +15,17 @@ import {
   type CarResearchReport,
   type SourceExecutor,
 } from "@sourceport/car-research";
+import {
+  collectDecisionContext,
+  compileDecisionContext,
+  renderDecisionContextMarkdown,
+  renderDecisionCorpusMarkdown,
+  validateDecisionContextBrief,
+  validateDecisionContextAssessment,
+  validateDecisionEvidenceCorpus,
+  type DecisionEvidenceCorpus,
+  type DecisionContextReport,
+} from "@sourceport/decision-context";
 import {
   executeWithFreshness,
   FileCache,
@@ -23,6 +36,9 @@ import {
   type SourceResult,
 } from "@sourceport/core";
 import { DongchediAdapter } from "@sourceport/dongchedi";
+import { Kr36Adapter } from "@sourceport/kr36";
+import { SamrAdapter } from "@sourceport/samr";
+import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
@@ -57,6 +73,19 @@ function researchExitCode(report: CarResearchReport): number {
   return report.status === "success" ? 0 : 1;
 }
 
+function contextExitCode(result: DecisionEvidenceCorpus | DecisionContextReport): number {
+  if ("brief" in result && result.status === "blocked") return 3;
+  return result.status === "success" ? 0 : 1;
+}
+
+async function readJsonFile(path: string): Promise<unknown> {
+  return JSON.parse(await readFile(path, "utf8")) as unknown;
+}
+
+async function saveJsonFile(path: string | undefined, value: unknown): Promise<void> {
+  if (path) await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
 export function createDefaultRegistry(): SourceRegistry {
   const registry = new SourceRegistry();
   registry.register(new AutohomeAdapter());
@@ -69,6 +98,12 @@ export function createDefaultRegistry(): SourceRegistry {
         (existsSync(localOpenCli) ? localOpenCli : "opencli"),
     }),
   );
+  const openCliCommand = process.env["SOURCEPORT_OPENCLI_COMMAND"] ??
+    (existsSync(localOpenCli) ? localOpenCli : "opencli");
+  registry.register(new BraveSearchAdapter({ openCliCommand }));
+  registry.register(new Kr36Adapter(openCliCommand));
+  registry.register(new SamrAdapter({ openCliCommand }));
+  registry.register(new XiaohongshuAdapter(openCliCommand));
   return registry;
 }
 
@@ -139,6 +174,7 @@ export async function runCli(
           input: { type: "string" },
           "input-file": { type: "string" },
           format: { type: "string", default: "json" },
+          "report-file": { type: "string" },
         },
       });
       const inlineInput = parsed.values.input;
@@ -189,12 +225,148 @@ export async function runCli(
         now,
       });
       const report = await researchCars(brief, { execute: executor, now });
+      await saveJsonFile(parsed.values["report-file"], report);
       if (format === "md") {
         stdout(renderCarResearchMarkdown(report));
       } else {
         writeJson(stdout, report);
       }
       return researchExitCode(report);
+    }
+
+    if (command === "car-context" && argv[1] === "collect") {
+      const parsed = parseArgs({
+        args: [...argv.slice(2)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          "report-file": { type: "string" },
+          format: { type: "string", default: "json" },
+          "corpus-file": { type: "string" },
+        },
+      });
+      const reportFile = parsed.values["report-file"];
+      if (!reportFile) {
+        writeJson(stderr, cliError("invalid_cli_input", "car-context collect requires --report-file"));
+        return 2;
+      }
+      if (parsed.values.format !== "json" && parsed.values.format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "--format must be json or md"));
+        return 2;
+      }
+      let report: CarResearchReport;
+      let brief: unknown;
+      try {
+        report = await readJsonFile(reportFile) as CarResearchReport;
+        brief = buildCarDecisionContextBrief(report);
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", `invalid car report: ${error instanceof Error ? error.message : "unknown error"}`));
+        return 2;
+      }
+      const executor = dependencies.researchExecutor ?? createRegistrySourceExecutor({
+        registry,
+        cache: dependencies.cache ?? new FileCache(),
+        now,
+      });
+      const corpus = await collectDecisionContext(brief, { execute: executor, now });
+      await saveJsonFile(parsed.values["corpus-file"], corpus);
+      if (parsed.values.format === "md") stdout(renderDecisionCorpusMarkdown(corpus));
+      else writeJson(stdout, corpus);
+      return contextExitCode(corpus);
+    }
+
+    if (command === "context" && argv[1] === "collect") {
+      const parsed = parseArgs({
+        args: [...argv.slice(2)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          "input-file": { type: "string" },
+          format: { type: "string", default: "json" },
+          "corpus-file": { type: "string" },
+        },
+      });
+      const inputFile = parsed.values["input-file"];
+      if (!inputFile) {
+        writeJson(stderr, cliError("invalid_cli_input", "context collect requires --input-file"));
+        return 2;
+      }
+      if (parsed.values.format !== "json" && parsed.values.format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "--format must be json or md"));
+        return 2;
+      }
+      let brief: unknown;
+      try {
+        brief = await readJsonFile(inputFile);
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", `cannot read context brief: ${error instanceof Error ? error.message : "unknown error"}`));
+        return 2;
+      }
+      const validation = validateDecisionContextBrief(brief);
+      if (!validation.ok) {
+        writeJson(stderr, { ...cliError("invalid_cli_input", "invalid DecisionContextBrief"), issues: validation.issues });
+        return 2;
+      }
+      const executor = dependencies.researchExecutor ?? createRegistrySourceExecutor({
+        registry,
+        cache: dependencies.cache ?? new FileCache(),
+        now,
+      });
+      const corpus = await collectDecisionContext(brief, { execute: executor, now });
+      await saveJsonFile(parsed.values["corpus-file"], corpus);
+      if (parsed.values.format === "md") stdout(renderDecisionCorpusMarkdown(corpus));
+      else writeJson(stdout, corpus);
+      return contextExitCode(corpus);
+    }
+
+    if (command === "context" && argv[1] === "compile") {
+      const parsed = parseArgs({
+        args: [...argv.slice(2)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          "corpus-file": { type: "string" },
+          "assessment-file": { type: "string" },
+          format: { type: "string", default: "json" },
+          "report-file": { type: "string" },
+        },
+      });
+      const corpusFile = parsed.values["corpus-file"];
+      const assessmentFile = parsed.values["assessment-file"];
+      if (!corpusFile || !assessmentFile) {
+        writeJson(stderr, cliError("invalid_cli_input", "context compile requires --corpus-file and --assessment-file"));
+        return 2;
+      }
+      if (parsed.values.format !== "json" && parsed.values.format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "--format must be json or md"));
+        return 2;
+      }
+      let corpus: unknown;
+      let assessment: unknown;
+      try {
+        [corpus, assessment] = await Promise.all([readJsonFile(corpusFile), readJsonFile(assessmentFile)]);
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", `cannot read context input: ${error instanceof Error ? error.message : "unknown error"}`));
+        return 2;
+      }
+      const corpusValidation = validateDecisionEvidenceCorpus(corpus);
+      const assessmentValidation = validateDecisionContextAssessment(assessment);
+      if (!corpusValidation.ok || !assessmentValidation.ok) {
+        writeJson(stderr, {
+          ...cliError("invalid_cli_input", "invalid context corpus or assessment"),
+          issues: [...corpusValidation.issues, ...assessmentValidation.issues],
+        });
+        return 2;
+      }
+      const compiled = compileDecisionContext(corpus, assessment, now);
+      if (!compiled.ok || !compiled.report) {
+        writeJson(stderr, { ...cliError("invalid_evidence_reference", "context assessment failed deterministic validation"), issues: compiled.issues });
+        return 2;
+      }
+      await saveJsonFile(parsed.values["report-file"], compiled.report);
+      if (parsed.values.format === "md") stdout(renderDecisionContextMarkdown(compiled.report));
+      else writeJson(stdout, compiled.report);
+      return contextExitCode(compiled.report);
     }
 
     if (command === "run") {
@@ -302,7 +474,7 @@ export async function runCli(
       stderr,
       cliError(
         "invalid_cli_input",
-        "expected sources, capabilities, run, doctor, or research-cars command",
+        "expected sources, capabilities, run, doctor, research-cars, car-context collect, or context collect|compile command",
       ),
     );
     return 2;

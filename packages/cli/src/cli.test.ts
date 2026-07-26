@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -63,6 +63,30 @@ const blockedResearchExecutor: SourceExecutor = async (request) => ({
     requiresUser: true,
     backend: "fixture",
   }],
+});
+
+const contextExecutor: SourceExecutor = async (request) => ({
+  requestId: request.requestId ?? "context",
+  source: request.source,
+  operation: request.operation,
+  operationSchemaVersion: "1.0.0",
+  status: "success",
+  data: {
+    query: "candidate",
+    items: [{ rank: 1, title: "Discovery lead", url: "https://example.com/lead", snippet: "lead only" }],
+  },
+  backend: "fixture",
+  retrievedAt: "2026-07-26T00:00:00.000Z",
+  evidence: [{
+    id: "context-evidence",
+    source: request.source,
+    operation: request.operation,
+    backend: "fixture",
+    retrievedAt: "2026-07-26T00:00:00.000Z",
+    verification: "source-verified",
+  }],
+  warnings: [],
+  recoveryActions: [],
 });
 
 class MemoryCache implements ResultCache {
@@ -233,6 +257,7 @@ describe("SourcePort CLI", () => {
   it("reads a brief from a file and renders Markdown", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sourceport-cli-"));
     const inputFile = join(directory, "brief.json");
+    const reportFile = join(directory, "report.json");
     await writeFile(inputFile, JSON.stringify(researchBrief), "utf8");
     try {
       const output = capture();
@@ -242,6 +267,8 @@ describe("SourcePort CLI", () => {
         inputFile,
         "--format",
         "md",
+        "--report-file",
+        reportFile,
       ], {
         registry: registry(),
         researchExecutor: blockedResearchExecutor,
@@ -251,6 +278,7 @@ describe("SourcePort CLI", () => {
       expect(exitCode).toBe(3);
       expect(output.stdout.join("")).toContain("# Car Research Report");
       expect(output.stdout.join("")).toContain("## Coverage limitations");
+      expect(JSON.parse(await readFile(reportFile, "utf8"))).toEqual(expect.objectContaining({ status: "blocked" }));
       expect(output.stderr).toEqual([]);
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -271,5 +299,74 @@ describe("SourcePort CLI", () => {
     expect(JSON.parse(output.stderr.join(""))).toEqual(expect.objectContaining({
       error: expect.objectContaining({ code: "invalid_cli_input" }),
     }));
+  });
+
+  it("collects and compiles decision context with JSON sidecars", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sourceport-context-cli-"));
+    const briefFile = join(directory, "context-brief.json");
+    const corpusFile = join(directory, "corpus.json");
+    const assessmentFile = join(directory, "assessment.json");
+    const reportFile = join(directory, "context-report.json");
+    await writeFile(briefFile, JSON.stringify({
+      domain: "cars",
+      query: "candidate context",
+      subjects: [{ id: "car", label: "Candidate", kind: "car-series", evidenceIds: [] }],
+      investigations: [{ id: "recent", label: "Recent", category: "news", subjectIds: ["car"], window: { from: "2025-07-26T00:00:00.000Z", to: "2026-07-26T00:00:00.000Z" } }],
+      sourceQueries: [{ id: "lead", investigationId: "recent", subjectIds: ["car"], source: "brave-search", operation: "search", parameters: { query: "candidate" }, sourceRole: "discovery" }],
+    }), "utf8");
+    try {
+      const collectOutput = capture();
+      const collectExit = await runCli([
+        "context", "collect",
+        "--input-file", briefFile,
+        "--format", "md",
+        "--corpus-file", corpusFile,
+      ], {
+        registry: registry(),
+        researchExecutor: contextExecutor,
+        now: () => new Date("2026-07-26T00:00:00.000Z"),
+        ...collectOutput.io,
+      });
+      expect(collectExit).toBe(0);
+      expect(collectOutput.stdout.join("")).toContain("# Decision Evidence Corpus");
+      const corpus = JSON.parse(await readFile(corpusFile, "utf8")) as {
+        documents: Array<{ id: string; evidenceIds: string[] }>;
+      };
+      await writeFile(assessmentFile, JSON.stringify({
+        events: [{
+          id: "lead-event",
+          title: "Alleged event",
+          category: "news",
+          summary: "A discovery lead requires verification",
+          subjectIds: ["car"],
+          documentIds: [corpus.documents[0]!.id],
+          evidenceIds: corpus.documents[0]!.evidenceIds,
+          verification: "unverified",
+          applicability: "unknown",
+          applicabilityBasis: "discovery lead only",
+          severity: "unknown",
+          remediation: "unknown",
+        }],
+        ownerSignals: [],
+        conflicts: [],
+        unknowns: [],
+      }), "utf8");
+
+      const compileOutput = capture();
+      const compileExit = await runCli([
+        "context", "compile",
+        "--corpus-file", corpusFile,
+        "--assessment-file", assessmentFile,
+        "--format", "md",
+        "--report-file", reportFile,
+      ], { registry: registry(), now: () => new Date("2026-07-26T00:00:00.000Z"), ...compileOutput.io });
+      expect(compileExit).toBe(1);
+      expect(compileOutput.stdout.join("")).toContain("context-only");
+      expect(JSON.parse(await readFile(reportFile, "utf8"))).toEqual(expect.objectContaining({
+        events: [expect.objectContaining({ decisionFlag: "context-only" })],
+      }));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

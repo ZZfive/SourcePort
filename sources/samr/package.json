@@ -1,5 +1,5 @@
 {
-  "name": "@sourceport/car-research",
+  "name": "@sourceport/samr",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,5 @@
       "import": "./dist/index.js"
     }
   },
-  "dependencies": {
-    "@sourceport/core": "*",
-    "@sourceport/decision-context": "*"
-  }
+  "dependencies": { "@sourceport/core": "*" }
 }

@@ -11,6 +11,9 @@
       "path": "./packages/car-research"
     },
     {
+      "path": "./packages/decision-context"
+    },
+    {
       "path": "./packages/cli"
     },
     {
@@ -18,6 +21,18 @@
     },
     {
       "path": "./sources/autohome"
+    },
+    {
+      "path": "./sources/brave-search"
+    },
+    {
+      "path": "./sources/kr36"
+    },
+    {
+      "path": "./sources/xiaohongshu"
+    },
+    {
+      "path": "./sources/samr"
     }
   ]
 }

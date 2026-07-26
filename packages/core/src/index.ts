@@ -10,6 +10,7 @@ export * from "./circuit.js";
 export * from "./contracts.js";
 export * from "./doctor.js";
 export * from "./evidence.js";
+export * from "./executor.js";
 export * from "./failures.js";
 export * from "./freshness.js";
 export * from "./health.js";

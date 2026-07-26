@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { OperationDescriptor } from "../adapter.js";
 import type { SourceRequest } from "../contracts.js";
-import { OpenCliBackend } from "./opencli.js";
+import { classifyOpenCliFailure, OpenCliBackend } from "./opencli.js";
 
 const context = {
   request: {
@@ -53,5 +53,55 @@ describe("OpenCliBackend", () => {
 
     expect(result.status).toBe("failed");
     expect(result.failure?.code).toBe("unexpected_source_shape");
+  });
+
+  it("appends JSON output and normalizes parsed data", async () => {
+    const backend = new OpenCliBackend({
+      name: "opencli",
+      command: process.execPath,
+      args: () => ["-e", "console.log(JSON.stringify(process.argv.slice(1)))", "--"],
+      jsonOutput: true,
+      parse: (data) => ({ args: data }),
+    });
+
+    const result = await backend.execute(context);
+
+    expect(result.status).toBe("success");
+    expect(result.data).toEqual({ args: ["-f", "json"] });
+  });
+
+  it("classifies common OpenCLI error envelopes", () => {
+    expect(classifyOpenCliFailure({
+      exitCode: 1,
+      stdout: "",
+      stderr: "code: AUTH_REQUIRED\nmessage: Login required",
+    }).code).toBe("auth_required");
+    expect(classifyOpenCliFailure({
+      exitCode: 1,
+      stdout: "",
+      stderr: "message: Browser connection dropped after navigate",
+    }).code).toBe("backend_unavailable");
+    expect(classifyOpenCliFailure({
+      exitCode: 1,
+      stdout: "",
+      stderr: "code: NO_DATA\nmessage: No results found",
+    }).code).toBe("empty_source_result");
+    expect(classifyOpenCliFailure({ exitCode: 1, stdout: "", stderr: "message: 请完成安全验证 captcha" }).code)
+      .toBe("human_verification_required");
+    expect(classifyOpenCliFailure({ exitCode: 1, stdout: "", stderr: "message: Too many requests, rate limit" }).code)
+      .toBe("rate_limited");
+    expect(classifyOpenCliFailure({ exitCode: 1, stdout: "", stderr: "message: selector missing after source drift" }).code)
+      .toBe("source_drift");
+  });
+
+  it("returns reconfiguration guidance when the OpenCLI process cannot start", async () => {
+    const backend = new OpenCliBackend({
+      name: "missing-opencli",
+      command: "/definitely/missing/opencli",
+      args: () => [],
+    });
+    const result = await backend.execute(context);
+    expect(result.failure?.code).toBe("backend_unavailable");
+    expect(result.recoveryActions).toEqual([expect.objectContaining({ kind: "reconfigure" })]);
   });
 });

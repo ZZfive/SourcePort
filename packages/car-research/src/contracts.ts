@@ -1,8 +1,8 @@
 import type {
   EvidenceRecord,
   RecoveryAction,
+  SourceExecutor as CoreSourceExecutor,
   SourceRequest,
-  SourceResult,
   SourceWarning,
 } from "@sourceport/core";
 
@@ -195,7 +195,7 @@ export interface CarResearchReport {
   failure?: CarResearchFailure;
 }
 
-export type SourceExecutor = (request: SourceRequest) => Promise<SourceResult>;
+export type SourceExecutor = CoreSourceExecutor;
 
 export interface CarResearchDependencies {
   execute: SourceExecutor;
