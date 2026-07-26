@@ -2,8 +2,9 @@
 
 Date: 2026-07-26
 
-Status: Implemented and locally verified on `codex/decision-context-car-mvp`;
-merge, push, and installed-Skill replacement remain unauthorized
+Status: Implemented, merged, pushed, and installed on 2026-07-26. Implementation
+commit `a8d1c5c` is contained in local and remote `main`, and the installed
+`research-cars` Skill matches the repository copy.
 
 ## Execution Status
 
@@ -40,8 +41,9 @@ sourceport context compile --corpus-file context-corpus.json \
 - Tests, typecheck, build, source doctors, and a bounded live car-context run
   pass before the milestone is described as complete.
 
-Merge, push, installed-Skill replacement, and branch deletion remain separate
-authorization gates.
+Merge, push, and installed-Skill replacement were explicitly authorized and
+completed on 2026-07-26. Branch deletion remains a separate gate and was not
+performed.
 
 ## Verification evidence
 
