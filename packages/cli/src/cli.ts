@@ -41,7 +41,7 @@ import { Kr36Adapter } from "@sourceport/kr36";
 import { SamrAdapter } from "@sourceport/samr";
 import { Auto12365Adapter } from "@sourceport/12365auto";
 import { createFileSnapshotStore, detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
-import { clusterFeedback } from "@sourceport/market-feedback";
+import { clusterFeedback, normalize12365Complaints } from "@sourceport/market-feedback";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
@@ -199,7 +199,10 @@ export async function runCli(
         if (!inputFile) { writeJson(stderr, cliError("invalid_cli_input", "market feedback requires --input-file")); return 2; }
         const raw = await readJsonFile(inputFile) as unknown;
         const records = Array.isArray(raw) ? raw : (raw && typeof raw === "object" && Array.isArray((raw as any).items) ? (raw as any).items : []);
-        const clusters = clusterFeedback(records as any);
+        const normalized = records.every((item: any) => String(item?.source ?? "") === "12365auto" || String(item?.id ?? item?.complaintId ?? "").startsWith("12365auto:") || item?.complaintId !== undefined)
+          ? normalize12365Complaints(records as Record<string, unknown>[])
+          : records as any[];
+        const clusters = clusterFeedback(normalized);
         await saveJsonFile(parsed.values["output-file"], clusters);
         writeJson(stdout, clusters);
         return 0;
