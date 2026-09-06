@@ -198,7 +198,12 @@ export async function runCli(
         const store = parsed.values.store;
         if (!store) { writeJson(stderr, cliError("invalid_cli_input", "market timeline requires --store")); return 2; }
         const snapshots = await createFileSnapshotStore(store).list(parsed.values["series-id"]);
-        writeJson(stdout, { seriesId: parsed.values["series-id"] ?? null, snapshots });
+        const events = snapshots.flatMap((snapshot, index) => {
+          const previous = index > 0 ? snapshots[index - 1] : undefined;
+          const event = detectMarketEvent(previous, snapshot);
+          return event ? [event] : [];
+        });
+        writeJson(stdout, { seriesId: parsed.values["series-id"] ?? null, snapshots, events });
         return 0;
       }
       if (subcommand === "feedback-refresh") {
