@@ -115,6 +115,12 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
     lines.push("", "## User feedback and complaints", "", "| Series | Topic | Signal | Rationale | Evidence |", "|---|---|---|---|---|");
     report.feedbackClusters.forEach((cluster) => lines.push(`| ${cell(cluster.series)} | ${cell(cluster.topic)} | ${cell(cluster.signal)} | ${cell(cluster.rationale)} | ${cell(cluster.evidenceIds.join(", "))} |`));
   }
+  if (report.recommendation) {
+    lines.push("## Recommendation");
+    lines.push(`- Status: ${cell(report.recommendation.status)}`);
+    lines.push(`- Rationale: ${cell(report.recommendation.rationale)}`);
+    lines.push(`- Evidence: ${cell(report.recommendation.evidenceIds.join(", "))}`);
+  }
   if (report.actionItems?.length) {
     lines.push("", "## Before-buy actions", "");
     report.actionItems.forEach((item) => lines.push(`- ${cell(item)}`));

@@ -206,6 +206,7 @@ export interface CarResearchReport {
   marketChanges?: Array<{ seriesId: string; kind: string; summary: string; evidenceIds: string[] }>;
   feedbackClusters?: Array<{ series: string; topic: string; signal: string; rationale: string; evidenceIds: string[] }>;
   actionItems?: string[];
+  recommendation?: { status: "recommend" | "verify-before-buy" | "pause"; rationale: string; evidenceIds: string[] };
   failure?: CarResearchFailure;
 }
 
