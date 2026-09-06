@@ -10,7 +10,10 @@ export function normalize12365Complaints(input: readonly Record<string, unknown>
     const summary = String(item.summary ?? item.problem ?? "").trim();
     if (!id || !brand || !series || !summary) return [];
     const categories = Array.isArray(item.categories) ? item.categories.filter((x): x is string => typeof x === "string") : [];
-    return [{ id: `12365auto:${id}`, source: "12365auto" as const, ...(item.url ? { sourceUrl: String(item.url) } : {}), brand, series, ...(item.modelYear ? { modelYear: String(item.modelYear) } : {}), ...(item.trimId ? { trimId: String(item.trimId) } : {}), ...(item.submittedAt ? { submittedAt: String(item.submittedAt) } : {}), summary, categories, ...(item.severity === "high" || item.severity === "medium" || item.severity === "low" ? { severity: item.severity } : {}), ...(item.manufacturerResponse ? { manufacturerResponse: String(item.manufacturerResponse) } : {}), ...(item.status ? { status: String(item.status) } : {}), evidenceIds: [item.evidenceId ? String(item.evidenceId) : `12365auto:${id}`] }];
+    const model = String(item.model ?? "").trim();
+    const inferredYear = model.match(/(?:20)?(\d{2})款/)?.[1];
+    const inferredTrim = model.replace(/(?:20)?\d{2}款?/g, "").trim();
+    return [{ id: `12365auto:${id}`, source: "12365auto" as const, ...(item.url ? { sourceUrl: String(item.url) } : {}), brand, series, ...(item.modelYear ? { modelYear: String(item.modelYear) } : inferredYear ? { modelYear: `20${inferredYear}` } : {}), ...(item.trimId ? { trimId: String(item.trimId) } : inferredTrim ? { trimId: inferredTrim } : {}), ...(item.submittedAt ? { submittedAt: String(item.submittedAt) } : {}), summary, categories, ...(item.severity === "high" || item.severity === "medium" || item.severity === "low" ? { severity: item.severity } : {}), ...(item.manufacturerResponse ? { manufacturerResponse: String(item.manufacturerResponse) } : {}), ...(item.status ? { status: String(item.status) } : {}), evidenceIds: [item.evidenceId ? String(item.evidenceId) : `12365auto:${id}`] }];
   });
 }
 const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[，。！？、,:：;；\s]+/g, "");
