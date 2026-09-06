@@ -157,6 +157,14 @@ function resultDocuments(
       url: string(item["url"]), sourceItemId: string(item["noticeId"]),
       ...(string(item["publishedAt"]) ? { publishedAt: string(item["publishedAt"]) } : {}),
     });
+  } else if (query.source === "12365auto" && query.operation === "search-complaints") {
+    for (const item of records(data["items"]).slice(0, limit)) output.push({
+      ...base, sourceRole: "owner-platform", stage: "discovery",
+      title: `${string(item["series"])} complaint ${string(item["complaintId"])}`,
+      content: string(item["summary"]), summary: string(item["summary"]),
+      url: string(item["url"]), sourceItemId: string(item["complaintId"]),
+      ...(string(item["submittedAt"]) ? { publishedAt: string(item["submittedAt"]) } : {}),
+    });
   } else if (query.source === "samr" && query.operation === "get-notice") {
     output.push({
       ...base, sourceRole: "official-primary", stage: "detail",

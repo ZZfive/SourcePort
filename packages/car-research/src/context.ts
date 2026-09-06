@@ -264,6 +264,14 @@ export function buildCarDecisionContextBrief(
       parameters: { query: `${candidate.series.name} ${candidate.trim.name} 真实车主 用车 质量`, limit: 2 },
       sourceRole: "community",
     });
+    addQuery(sourceQueries, queryKeys, {
+      investigationId: ownerInvestigationId,
+      subjectIds: [seriesId, trimId],
+      source: "12365auto",
+      operation: "search-complaints",
+      parameters: { query: `${candidate.series.brand} ${candidate.series.name} ${candidate.trim.name}`, limit: limits.perQueryDocuments },
+      sourceRole: "owner-platform",
+    });
 
     for (const supplier of suppliersFor(report, candidate)) {
       const supplierId = `supplier:${shortHash(`${supplier.kind}:${supplier.name}`)}`;
