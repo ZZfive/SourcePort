@@ -342,6 +342,19 @@ export async function runCli(
           .filter((record: any) => record.complaintId && record.series && record.summary);
         const clusters = clusterFeedback(normalize12365Complaints(records));
         await saveJsonFile(feedbackFile, clusters);
+        report.feedbackClusters = clusters.map((cluster) => ({
+          series: cluster.series,
+          topic: cluster.topic,
+          signal: cluster.signal,
+          rationale: cluster.rationale,
+          evidenceIds: cluster.evidenceIds,
+        }));
+        report.actionItems = [
+          ...(report.actionItems ?? []),
+          ...(clusters.some((cluster) => cluster.signal === "pause") ? ["在官方风险和整改状态核实前暂缓相关候选"] : []),
+          ...(clusters.some((cluster) => cluster.signal === "watch" || cluster.signal === "verify-before-buy") ? ["试驾时重点验证投诉聚类问题，并向售后确认处理方案"] : []),
+        ];
+        await saveJsonFile(reportFile, report);
       }
       await saveJsonFile(parsed.values["corpus-file"], corpus);
       if (parsed.values.format === "md") stdout(renderDecisionCorpusMarkdown(corpus));
