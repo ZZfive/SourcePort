@@ -39,7 +39,7 @@ import { DongchediAdapter } from "@sourceport/dongchedi";
 import { Kr36Adapter } from "@sourceport/kr36";
 import { SamrAdapter } from "@sourceport/samr";
 import { Auto12365Adapter } from "@sourceport/12365auto";
-import { detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
+import { createFileSnapshotStore, detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
@@ -174,13 +174,22 @@ export async function runCli(
         args: [...argv.slice(2)],
         allowPositionals: false,
         strict: true,
-        options: { "input-file": { type: "string" }, before: { type: "string" }, after: { type: "string" } },
+        options: { "input-file": { type: "string" }, store: { type: "string" }, before: { type: "string" }, after: { type: "string" }, "series-id": { type: "string" } },
       });
       if (subcommand === "snapshot") {
         const inputFile = parsed.values["input-file"];
         if (!inputFile) { writeJson(stderr, cliError("invalid_cli_input", "market snapshot requires --input-file")); return 2; }
         const snapshot = await readJsonFile(inputFile) as VehicleSnapshot;
+        const store = parsed.values.store;
+        if (store) await createFileSnapshotStore(store).save(snapshot);
         writeJson(stdout, { ...snapshot, freshness: snapshotFreshness(snapshot, now()) });
+        return 0;
+      }
+      if (subcommand === "timeline") {
+        const store = parsed.values.store;
+        if (!store) { writeJson(stderr, cliError("invalid_cli_input", "market timeline requires --store")); return 2; }
+        const snapshots = await createFileSnapshotStore(store).list(parsed.values["series-id"]);
+        writeJson(stdout, { seriesId: parsed.values["series-id"] ?? null, snapshots });
         return 0;
       }
       if (subcommand === "diff") {

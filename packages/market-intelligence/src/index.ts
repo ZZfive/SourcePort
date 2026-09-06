@@ -3,6 +3,7 @@ export type MarketEventKind = "launch" | "facelift" | "new-trim" | "price-change
 export interface VehicleSnapshot { id: string; seriesId: string; trimId?: string; brand: string; series: string; modelYear?: string; capturedAt: string; validUntil?: string; fields: Record<string, unknown>; sourceEvidenceIds: string[]; }
 export interface VehicleChange { field: string; before: unknown; after: unknown; kind: MarketEventKind; evidenceIds: string[]; }
 export interface MarketEvent { id: string; kind: MarketEventKind; seriesId: string; trimId?: string; occurredAt?: string; detectedAt: string; changes: VehicleChange[]; evidenceIds: string[]; }
+export interface SnapshotStore { save(snapshot: VehicleSnapshot): Promise<void>; list(seriesId?: string): Promise<VehicleSnapshot[]>; }
 export function freshness(snapshot: VehicleSnapshot, now = new Date()): FreshnessStatus {
   if (!snapshot.validUntil) return "unverified";
   const until = Date.parse(snapshot.validUntil);
@@ -29,4 +30,24 @@ export function detectMarketEvent(previous: VehicleSnapshot | undefined, current
   const changes = diffSnapshots(previous, current);
   if (!changes.length && previous) return undefined;
   return { id: `market:${current.id}:${current.capturedAt}`, kind: previous ? (changes[0]?.kind ?? "configuration-change") : "launch", seriesId: current.seriesId, ...(current.trimId ? { trimId: current.trimId } : {}), detectedAt: current.capturedAt, changes, evidenceIds: [...new Set(changes.flatMap((change) => change.evidenceIds))] };
+}
+
+export function createFileSnapshotStore(directory: string): SnapshotStore {
+  return {
+    async save(snapshot) {
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      await mkdir(directory, { recursive: true });
+      const safe = snapshot.id.replace(/[^a-zA-Z0-9._-]/g, "_");
+      await writeFile(`${directory}/${safe}.json`, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    },
+    async list(seriesId) {
+      const { readdir, readFile } = await import("node:fs/promises");
+      let names: string[]; try { names = await readdir(directory); } catch { return []; }
+      const snapshots: VehicleSnapshot[] = [];
+      for (const name of names.filter((item) => item.endsWith(".json"))) {
+        try { const value = JSON.parse(await readFile(`${directory}/${name}`, "utf8")) as VehicleSnapshot; if (!seriesId || value.seriesId === seriesId) snapshots.push(value); } catch { /* ignore corrupt files; callers retain explicit empty coverage */ }
+      }
+      return snapshots.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+    },
+  };
 }
