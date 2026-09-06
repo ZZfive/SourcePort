@@ -633,6 +633,8 @@ sourceport market snapshot --input-file vehicle-snapshot.json --store snapshots/
 sourceport market diff --before snapshots/old.json --after snapshots/new.json
 sourceport market timeline --store snapshots/ --series-id <series-id>
 sourceport market feedback --input-file complaints.json --output-file feedback-clusters.json
+sourceport market feedback-snapshot --input-file complaints.json --store complaint-snapshots/
+sourceport market feedback-diff --before complaint-snapshots/old.json --after complaint-snapshots/new.json
 sourceport research-cars --input-file brief.json --market-store snapshots/ \
   --feedback-file feedback-clusters.json --format md --report-file report.json
 ```
