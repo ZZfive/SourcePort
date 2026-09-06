@@ -46,6 +46,11 @@ export function enrichCarResearchReport(
     topic: cluster.topic,
     signal: cluster.signal,
     rationale: cluster.rationale,
+    ...(cluster.modelYears.length ? { modelYears: cluster.modelYears } : {}),
+    ...(cluster.trimIds.length ? { trimIds: cluster.trimIds } : {}),
+    ...(cluster.firstSeenAt ? { firstSeenAt: cluster.firstSeenAt } : {}),
+    ...(cluster.lastSeenAt ? { lastSeenAt: cluster.lastSeenAt } : {}),
+    sourceCount: cluster.sourceCount,
     evidenceIds: cluster.evidenceIds,
   }));
   const actions = actionItems(report, freshness, feedback);

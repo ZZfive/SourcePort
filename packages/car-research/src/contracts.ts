@@ -204,7 +204,7 @@ export interface CarResearchReport {
   dataAsOf?: string;
   freshness?: "fresh" | "aging" | "stale" | "unverified";
   marketChanges?: Array<{ seriesId: string; kind: string; summary: string; evidenceIds: string[] }>;
-  feedbackClusters?: Array<{ series: string; topic: string; signal: string; rationale: string; evidenceIds: string[] }>;
+  feedbackClusters?: Array<{ series: string; topic: string; signal: string; rationale: string; modelYears?: string[]; trimIds?: string[]; firstSeenAt?: string; lastSeenAt?: string; sourceCount?: number; evidenceIds: string[] }>;
   actionItems?: string[];
   recommendation?: { status: "recommend" | "verify-before-buy" | "pause"; rationale: string; evidenceIds: string[] };
   failure?: CarResearchFailure;
