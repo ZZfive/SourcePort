@@ -2,6 +2,17 @@ export type FeedbackSource = "12365auto" | "dongchedi" | "xiaohongshu" | "media"
 export type MarketSignal = "insufficient-evidence" | "watch" | "verify-before-buy" | "pause" | "resolved";
 export interface FeedbackRecord { id: string; source: FeedbackSource; sourceUrl?: string; brand: string; series: string; modelYear?: string; trimId?: string; submittedAt?: string; summary: string; categories: string[]; severity?: "low" | "medium" | "high"; officialConfirmed?: boolean; manufacturerResponse?: string; status?: string; evidenceIds: string[]; }
 export interface FeedbackCluster { id: string; brand: string; series: string; modelYears: string[]; trimIds: string[]; topic: string; records: FeedbackRecord[]; firstSeenAt?: string; lastSeenAt?: string; sourceCount: number; signal: MarketSignal; rationale: string; evidenceIds: string[]; }
+export function normalize12365Complaints(input: readonly Record<string, unknown>[]): FeedbackRecord[] {
+  return input.flatMap((item) => {
+    const id = String(item.complaintId ?? item.id ?? "").trim();
+    const brand = String(item.brand ?? "").trim();
+    const series = String(item.series ?? "").trim();
+    const summary = String(item.summary ?? item.problem ?? "").trim();
+    if (!id || !brand || !series || !summary) return [];
+    const categories = Array.isArray(item.categories) ? item.categories.filter((x): x is string => typeof x === "string") : [];
+    return [{ id: `12365auto:${id}`, source: "12365auto" as const, ...(item.url ? { sourceUrl: String(item.url) } : {}), brand, series, ...(item.modelYear ? { modelYear: String(item.modelYear) } : {}), ...(item.trimId ? { trimId: String(item.trimId) } : {}), ...(item.submittedAt ? { submittedAt: String(item.submittedAt) } : {}), summary, categories, ...(item.severity === "high" || item.severity === "medium" || item.severity === "low" ? { severity: item.severity } : {}), ...(item.manufacturerResponse ? { manufacturerResponse: String(item.manufacturerResponse) } : {}), ...(item.status ? { status: String(item.status) } : {}), evidenceIds: [item.evidenceId ? String(item.evidenceId) : `12365auto:${id}`] }];
+  });
+}
 const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[，。！？、,:：;；\s]+/g, "");
 const canonicalTopic = (record: FeedbackRecord) => {
   const text = normalize(`${record.categories.join(" ")} ${record.summary}`);
