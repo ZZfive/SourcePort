@@ -76,6 +76,9 @@ export interface CarResearchBrief {
     city: string;
     currency?: "CNY";
   };
+  purchaseTiming?: { targetDate?: string; urgency?: "now" | "soon" | "exploring" };
+  budget?: { minimumCny?: number; maximumCny?: number; basis?: "guide" | "reference" | "deal" | "on-road" };
+  usageContext?: { commuteKmPerDay?: number; longDistanceFrequency?: "rare" | "monthly" | "weekly"; familyMembers?: number; charging?: "home" | "public" | "none" | "unknown" };
   criteria: CarCriterion[];
   seeds: CandidateSeed[];
   costEvidence?: CostEvidence[];
