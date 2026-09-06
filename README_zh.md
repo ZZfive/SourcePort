@@ -624,6 +624,21 @@ SourcePort 当前可以直接用于：
 
 ## 开发和验证
 
+### 市场快照与用户反馈
+
+汽车研究支持手动保存车型快照、比较市场变化，并将车质网或其他来源的原始反馈聚类为可审计信号：
+
+```bash
+sourceport market snapshot --input-file vehicle-snapshot.json --store snapshots/
+sourceport market diff --before snapshots/old.json --after snapshots/new.json
+sourceport market timeline --store snapshots/ --series-id <series-id>
+sourceport market feedback --input-file complaints.json --output-file feedback-clusters.json
+sourceport research-cars --input-file brief.json --market-store snapshots/ \
+  --feedback-file feedback-clusters.json --format md --report-file report.json
+```
+
+反馈信号包括 `insufficient-evidence`、`watch`、`verify-before-buy`、`pause` 和 `resolved`。投诉数量不直接等同于故障率；来源不可用、数据过期或证据不足时，报告会保留对应状态和核验行动。
+
 ~~~bash
 npm run typecheck
 npm test
