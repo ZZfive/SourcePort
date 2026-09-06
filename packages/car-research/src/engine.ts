@@ -633,6 +633,18 @@ export async function researchCars(
         ]),
       },
       trim,
+      alternatives: (trims.data?.items ?? [])
+        .filter((item) => item.trimId !== trim.trimId)
+        .map((item) => ({
+          trimId: item.trimId,
+          name: item.name,
+          year: item.year,
+          price: item.dealerPrice || item.ownerPrice || item.officialPrice,
+          selectionStatus: "not-selected" as const,
+          reason: /智驾|智能驾驶|辅助驾驶|领航|激光雷达|高阶/i.test(item.name)
+            ? "not selected because another trim had stronger decision-relevant equipment signals"
+            : "not selected by bounded exact-trim selection",
+        })),
       crossSource,
       ...(series.data ? { seriesOverview: series.data } : {}),
       ownerReviews: reviews.data?.items ?? [],

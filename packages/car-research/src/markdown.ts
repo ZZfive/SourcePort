@@ -97,6 +97,14 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
       `| ${cell(candidate.series.name)} | ${assistance.claimedLevel} | ${cell(assistance.capabilities)} | ${cell(assistance.hardware)} | ${cell(assistance.system)} |`,
     );
   }
+  if (report.candidates.some((candidate) => candidate.alternatives?.length)) {
+    lines.push("", "## Unselected exact trims", "", "| Series | Trim | Year | Price | Reason |", "|---|---|---|---|---|");
+    for (const candidate of report.candidates) {
+      for (const alternative of candidate.alternatives ?? []) {
+        lines.push(`| ${cell(candidate.series.name)} | ${cell(alternative.name)} | ${cell(alternative.year)} | ${cell(alternative.price)} | ${cell(alternative.reason)} |`);
+      }
+    }
+  }
   lines.push("", "## Coverage limitations", "");
   report.coverage.limitations.forEach((limitation) => lines.push(`- ${limitation}`));
   if (report.marketChanges?.length) {

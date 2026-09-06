@@ -148,6 +148,14 @@ export interface CarCandidate {
     sourceUrl: string;
     configurationUrl: string;
   };
+  alternatives?: Array<{
+    trimId: string;
+    name: string;
+    year: string;
+    price: string;
+    selectionStatus: "not-selected";
+    reason: string;
+  }>;
   crossSource: CrossSourceMatch;
   seriesOverview?: unknown;
   ownerReviews: unknown[];
