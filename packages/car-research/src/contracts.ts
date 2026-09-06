@@ -192,6 +192,12 @@ export interface CarResearchReport {
   warnings: SourceWarning[];
   recoveryActions: RecoveryAction[];
   evidence: EvidenceRecord[];
+  /** Optional enrichment supplied by market-intelligence/market-feedback. */
+  dataAsOf?: string;
+  freshness?: "fresh" | "aging" | "stale" | "unverified";
+  marketChanges?: Array<{ seriesId: string; kind: string; summary: string; evidenceIds: string[] }>;
+  feedbackClusters?: Array<{ series: string; topic: string; signal: string; rationale: string; evidenceIds: string[] }>;
+  actionItems?: string[];
   failure?: CarResearchFailure;
 }
 

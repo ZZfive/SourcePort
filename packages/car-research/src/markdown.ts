@@ -64,6 +64,8 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
     `- Query: ${report.query}`,
     `- Market: ${report.market.city}`,
     `- Generated: ${report.generatedAt}`,
+    ...(report.dataAsOf ? [`- Data as of: ${report.dataAsOf}`] : []),
+    ...(report.freshness ? [`- Freshness: ${report.freshness}`] : []),
     `- Coverage: ${report.coverage.mode}`,
     "",
     "## Candidates",
@@ -97,6 +99,18 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
   }
   lines.push("", "## Coverage limitations", "");
   report.coverage.limitations.forEach((limitation) => lines.push(`- ${limitation}`));
+  if (report.marketChanges?.length) {
+    lines.push("", "## Recent market changes", "", "| Series | Change | Summary | Evidence |", "|---|---|---|---|");
+    report.marketChanges.forEach((change) => lines.push(`| ${cell(change.seriesId)} | ${cell(change.kind)} | ${cell(change.summary)} | ${cell(change.evidenceIds.join(", "))} |`));
+  }
+  if (report.feedbackClusters?.length) {
+    lines.push("", "## User feedback and complaints", "", "| Series | Topic | Signal | Rationale | Evidence |", "|---|---|---|---|---|");
+    report.feedbackClusters.forEach((cluster) => lines.push(`| ${cell(cluster.series)} | ${cell(cluster.topic)} | ${cell(cluster.signal)} | ${cell(cluster.rationale)} | ${cell(cluster.evidenceIds.join(", "))} |`));
+  }
+  if (report.actionItems?.length) {
+    lines.push("", "## Before-buy actions", "");
+    report.actionItems.forEach((item) => lines.push(`- ${cell(item)}`));
+  }
   if (report.unsupportedCriteria.length > 0) {
     lines.push("", "## Unsupported criteria", "");
     report.unsupportedCriteria.forEach((criterion) =>
