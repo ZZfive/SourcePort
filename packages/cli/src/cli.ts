@@ -178,6 +178,13 @@ export async function runCli(
         strict: true,
         options: { "input-file": { type: "string" }, store: { type: "string" }, before: { type: "string" }, after: { type: "string" }, "series-id": { type: "string" }, "output-file": { type: "string" } },
       });
+      if (subcommand === "refresh") {
+        const inputFile = parsed.values["input-file"]; const storeDir = parsed.values.store;
+        if (!inputFile || !storeDir) { writeJson(stderr, cliError("invalid_cli_input", "market refresh requires --input-file and --store")); return 2; }
+        const snapshot = await readJsonFile(inputFile) as VehicleSnapshot; const store = createFileSnapshotStore(storeDir);
+        const previous = (await store.list(snapshot.seriesId)).at(-1); await store.save(snapshot);
+        writeJson(stdout, { snapshot, freshness: snapshotFreshness(snapshot, now()), event: detectMarketEvent(previous, snapshot) ?? null }); return 0;
+      }
       if (subcommand === "snapshot") {
         const inputFile = parsed.values["input-file"];
         if (!inputFile) { writeJson(stderr, cliError("invalid_cli_input", "market snapshot requires --input-file")); return 2; }
@@ -229,7 +236,7 @@ export async function runCli(
         writeJson(stdout, { event: detectMarketEvent(before, after) ?? null });
         return 0;
       }
-      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot, diff, timeline, feedback, feedback-snapshot and feedback-diff"));
+      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot, refresh, diff, timeline, feedback, feedback-snapshot and feedback-diff"));
       return 2;
     }
 

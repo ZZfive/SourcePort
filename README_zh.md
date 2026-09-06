@@ -630,6 +630,7 @@ SourcePort 当前可以直接用于：
 
 ```bash
 sourceport market snapshot --input-file vehicle-snapshot.json --store snapshots/
+sourceport market refresh --input-file vehicle-snapshot.json --store snapshots/
 sourceport market diff --before snapshots/old.json --after snapshots/new.json
 sourceport market timeline --store snapshots/ --series-id <series-id>
 sourceport market feedback --input-file complaints.json --output-file feedback-clusters.json
