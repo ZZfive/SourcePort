@@ -41,6 +41,7 @@ import { Kr36Adapter } from "@sourceport/kr36";
 import { SamrAdapter } from "@sourceport/samr";
 import { Auto12365Adapter } from "@sourceport/12365auto";
 import { createFileSnapshotStore, detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
+import { clusterFeedback } from "@sourceport/market-feedback";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
@@ -175,7 +176,7 @@ export async function runCli(
         args: [...argv.slice(2)],
         allowPositionals: false,
         strict: true,
-        options: { "input-file": { type: "string" }, store: { type: "string" }, before: { type: "string" }, after: { type: "string" }, "series-id": { type: "string" } },
+        options: { "input-file": { type: "string" }, store: { type: "string" }, before: { type: "string" }, after: { type: "string" }, "series-id": { type: "string" }, "output-file": { type: "string" } },
       });
       if (subcommand === "snapshot") {
         const inputFile = parsed.values["input-file"];
@@ -191,6 +192,16 @@ export async function runCli(
         if (!store) { writeJson(stderr, cliError("invalid_cli_input", "market timeline requires --store")); return 2; }
         const snapshots = await createFileSnapshotStore(store).list(parsed.values["series-id"]);
         writeJson(stdout, { seriesId: parsed.values["series-id"] ?? null, snapshots });
+        return 0;
+      }
+      if (subcommand === "feedback") {
+        const inputFile = parsed.values["input-file"];
+        if (!inputFile) { writeJson(stderr, cliError("invalid_cli_input", "market feedback requires --input-file")); return 2; }
+        const raw = await readJsonFile(inputFile) as unknown;
+        const records = Array.isArray(raw) ? raw : (raw && typeof raw === "object" && Array.isArray((raw as any).items) ? (raw as any).items : []);
+        const clusters = clusterFeedback(records as any);
+        await saveJsonFile(parsed.values["output-file"], clusters);
+        writeJson(stdout, clusters);
         return 0;
       }
       if (subcommand === "diff") {
