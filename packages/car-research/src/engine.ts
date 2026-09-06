@@ -171,8 +171,14 @@ function identityFromAutohome(
   };
 }
 
-function cheapestTrim(items: readonly DongchediTrim[]): DongchediTrim | undefined {
+function selectBestTrim(items: readonly DongchediTrim[]): DongchediTrim | undefined {
   return [...items].sort((left, right) => {
+    // Prefer trims whose names advertise the requested safety/intelligence
+    // equipment, then use price as the tie breaker. Configuration evidence is
+    // still authoritative; this is only a bounded selection heuristic.
+    const signal = (trim: DongchediTrim) => /智驾|智能驾驶|辅助驾驶|领航|激光雷达|高阶/i.test(trim.name) ? 0 : 1;
+    const signalDiff = signal(left) - signal(right);
+    if (signalDiff !== 0) return signalDiff;
     const leftPrice = parsePriceRangeCny(
       left.dealerPrice || left.ownerPrice || left.officialPrice,
     )?.minimumCny ?? Number.POSITIVE_INFINITY;
@@ -554,7 +560,7 @@ export async function researchCars(
       "get-owner-reviews",
       { seriesId: draft.dongchedi.seriesId, limit: limits.ownerReviewsPerSeries },
     );
-    const trim = cheapestTrim(trims.data?.items ?? []);
+    const trim = selectBestTrim(trims.data?.items ?? []);
     if (!trim) {
       addWarning({
         code: "no_exact_trim",
