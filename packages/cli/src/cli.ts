@@ -39,6 +39,7 @@ import { DongchediAdapter } from "@sourceport/dongchedi";
 import { Kr36Adapter } from "@sourceport/kr36";
 import { SamrAdapter } from "@sourceport/samr";
 import { Auto12365Adapter } from "@sourceport/12365auto";
+import { detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
@@ -165,6 +166,34 @@ export async function runCli(
         stdout(formatDoctorHuman(report));
       }
       return doctorExitCode(report);
+    }
+
+    if (command === "market") {
+      const subcommand = argv[1];
+      const parsed = parseArgs({
+        args: [...argv.slice(2)],
+        allowPositionals: false,
+        strict: true,
+        options: { "input-file": { type: "string" }, before: { type: "string" }, after: { type: "string" } },
+      });
+      if (subcommand === "snapshot") {
+        const inputFile = parsed.values["input-file"];
+        if (!inputFile) { writeJson(stderr, cliError("invalid_cli_input", "market snapshot requires --input-file")); return 2; }
+        const snapshot = await readJsonFile(inputFile) as VehicleSnapshot;
+        writeJson(stdout, { ...snapshot, freshness: snapshotFreshness(snapshot, now()) });
+        return 0;
+      }
+      if (subcommand === "diff") {
+        const beforeFile = parsed.values.before;
+        const afterFile = parsed.values.after;
+        if (!beforeFile || !afterFile) { writeJson(stderr, cliError("invalid_cli_input", "market diff requires --before and --after")); return 2; }
+        const before = await readJsonFile(beforeFile) as VehicleSnapshot;
+        const after = await readJsonFile(afterFile) as VehicleSnapshot;
+        writeJson(stdout, { event: detectMarketEvent(before, after) ?? null });
+        return 0;
+      }
+      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot and diff"));
+      return 2;
     }
 
     if (command === "research-cars") {
