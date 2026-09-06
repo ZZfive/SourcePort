@@ -258,6 +258,19 @@ export function validateCarResearchBrief(input: unknown): BriefValidationResult 
   if (!isObject(market) || typeof market["city"] !== "string" || !market["city"].trim()) {
     issues.push({ path: "market.city", message: "market.city must be a non-empty string" });
   }
+  const budget = input["budget"];
+  if (budget !== undefined) {
+    if (!isObject(budget)) issues.push({ path: "budget", message: "budget must be an object" });
+    else {
+      const min = budget["minimumCny"]; const max = budget["maximumCny"];
+      if (min !== undefined && (!Number.isFinite(Number(min)) || Number(min) < 0)) issues.push({ path: "budget.minimumCny", message: "minimumCny must be non-negative" });
+      if (max !== undefined && (!Number.isFinite(Number(max)) || Number(max) < 0 || (min !== undefined && Number(max) < Number(min)))) issues.push({ path: "budget.maximumCny", message: "maximumCny must be >= minimumCny" });
+      if (budget["basis"] !== undefined && !["guide", "reference", "deal", "on-road"].includes(String(budget["basis"]))) issues.push({ path: "budget.basis", message: "basis is invalid" });
+    }
+  }
+  const usage = input["usageContext"];
+  if (usage !== undefined && !isObject(usage)) issues.push({ path: "usageContext", message: "usageContext must be an object" });
+  if (isObject(usage) && usage["commuteKmPerDay"] !== undefined && (!Number.isFinite(Number(usage["commuteKmPerDay"])) || Number(usage["commuteKmPerDay"]) < 0)) issues.push({ path: "usageContext.commuteKmPerDay", message: "commuteKmPerDay must be non-negative" });
   const criteria = input["criteria"];
   if (!Array.isArray(criteria)) {
     issues.push({ path: "criteria", message: "criteria must be an array" });
