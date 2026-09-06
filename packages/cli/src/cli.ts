@@ -232,6 +232,7 @@ export async function runCli(
           "report-file": { type: "string" },
           "market-store": { type: "string" },
           "feedback-file": { type: "string" },
+          "assessment-file": { type: "string" },
         },
       });
       const inlineInput = parsed.values.input;
@@ -308,6 +309,7 @@ export async function runCli(
           format: { type: "string", default: "json" },
           "corpus-file": { type: "string" },
           "feedback-file": { type: "string" },
+          "assessment-file": { type: "string" },
         },
       });
       const reportFile = parsed.values["report-file"];
@@ -357,6 +359,18 @@ export async function runCli(
         await saveJsonFile(reportFile, report);
       }
       await saveJsonFile(parsed.values["corpus-file"], corpus);
+      const assessmentFile = parsed.values["assessment-file"];
+      if (assessmentFile) {
+        const assessment = await readJsonFile(assessmentFile);
+        const validation = validateDecisionContextAssessment(assessment);
+        if (!validation.ok) { writeJson(stderr, { ...cliError("invalid_cli_input", "invalid context assessment"), issues: validation.issues }); return 2; }
+        const compiled = compileDecisionContext(corpus, assessment, now);
+        if (!compiled.ok || !compiled.report) { writeJson(stderr, { ...cliError("invalid_evidence_reference", "context assessment failed deterministic validation"), issues: compiled.issues }); return 2; }
+        await saveJsonFile(parsed.values["report-file"], compiled.report);
+        if (parsed.values.format === "md") stdout(renderDecisionContextMarkdown(compiled.report));
+        else writeJson(stdout, compiled.report);
+        return contextExitCode(compiled.report);
+      }
       if (parsed.values.format === "md") stdout(renderDecisionCorpusMarkdown(corpus));
       else writeJson(stdout, corpus);
       return contextExitCode(corpus);
