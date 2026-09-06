@@ -8,6 +8,7 @@ import { AutohomeAdapter } from "@sourceport/autohome";
 import { BraveSearchAdapter } from "@sourceport/brave-search";
 import {
   buildCarDecisionContextBrief,
+  enrichCarResearchReport,
   createRegistrySourceExecutor,
   renderCarResearchMarkdown,
   researchCars,
@@ -215,6 +216,8 @@ export async function runCli(
           "input-file": { type: "string" },
           format: { type: "string", default: "json" },
           "report-file": { type: "string" },
+          "market-store": { type: "string" },
+          "feedback-file": { type: "string" },
         },
       });
       const inlineInput = parsed.values.input;
@@ -264,7 +267,14 @@ export async function runCli(
         cache: dependencies.cache ?? new FileCache(),
         now,
       });
-      const report = await researchCars(brief, { execute: executor, now });
+      let report = await researchCars(brief, { execute: executor, now });
+      const marketStore = parsed.values["market-store"];
+      const feedbackFile = parsed.values["feedback-file"];
+      if (marketStore || feedbackFile) {
+        const snapshots = marketStore ? await createFileSnapshotStore(marketStore).list() : [];
+        const feedbackClusters = feedbackFile ? await readJsonFile(feedbackFile) as any[] : [];
+        report = enrichCarResearchReport(report, { snapshots, feedbackClusters, now: now() });
+      }
       await saveJsonFile(parsed.values["report-file"], report);
       if (format === "md") {
         stdout(renderCarResearchMarkdown(report));
