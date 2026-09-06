@@ -685,6 +685,7 @@ export async function researchCars(
     status,
     query: brief.query,
     market: brief.market,
+    decisionContext: { ...(brief.purchaseTiming ? { purchaseTiming: brief.purchaseTiming } : {}), ...(brief.budget ? { budget: brief.budget } : {}), ...(brief.usageContext ? { usageContext: brief.usageContext } : {}) },
     generatedAt: now().toISOString(),
     coverage: {
       mode: "bounded",

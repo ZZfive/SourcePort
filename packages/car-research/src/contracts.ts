@@ -195,6 +195,7 @@ export interface CarResearchReport {
   status: "success" | "partial" | "blocked" | "failed";
   query: string;
   market: CarResearchBrief["market"];
+  decisionContext?: Pick<CarResearchBrief, "purchaseTiming" | "budget" | "usageContext">;
   generatedAt: string;
   coverage: CoverageReport;
   candidates: CarCandidate[];
