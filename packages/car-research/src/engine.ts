@@ -171,24 +171,6 @@ function identityFromAutohome(
   };
 }
 
-function selectBestTrim(items: readonly DongchediTrim[]): DongchediTrim | undefined {
-  return [...items].sort((left, right) => {
-    // Prefer trims whose names advertise the requested safety/intelligence
-    // equipment, then use price as the tie breaker. Configuration evidence is
-    // still authoritative; this is only a bounded selection heuristic.
-    const signal = (trim: DongchediTrim) => /智驾|智能驾驶|辅助驾驶|领航|激光雷达|高阶/i.test(trim.name) ? 0 : 1;
-    const signalDiff = signal(left) - signal(right);
-    if (signalDiff !== 0) return signalDiff;
-    const leftPrice = parsePriceRangeCny(
-      left.dealerPrice || left.ownerPrice || left.officialPrice,
-    )?.minimumCny ?? Number.POSITIVE_INFINITY;
-    const rightPrice = parsePriceRangeCny(
-      right.dealerPrice || right.ownerPrice || right.officialPrice,
-    )?.minimumCny ?? Number.POSITIVE_INFINITY;
-    return leftPrice - rightPrice || left.trimId.localeCompare(right.trimId);
-  })[0];
-}
-
 function emptyReport(input: unknown, now: Date, issues: Array<{ path: string; message: string }>): CarResearchReport {
   const record = input !== null && typeof input === "object" && !Array.isArray(input)
     ? input as Record<string, unknown>
@@ -560,7 +542,14 @@ export async function researchCars(
       "get-owner-reviews",
       { seriesId: draft.dongchedi.seriesId, limit: limits.ownerReviewsPerSeries },
     );
-    const trim = selectBestTrim(trims.data?.items ?? []);
+    const trimItems = trims.data?.items ?? [];
+    const rankedTrims = [...trimItems].sort((left, right) => {
+      const signal = (item: DongchediTrim) => /智驾|智能驾驶|辅助驾驶|领航|激光雷达|高阶/i.test(item.name) ? 0 : 1;
+      const lp = parsePriceRangeCny(left.dealerPrice || left.ownerPrice || left.officialPrice)?.minimumCny ?? Number.POSITIVE_INFINITY;
+      const rp = parsePriceRangeCny(right.dealerPrice || right.ownerPrice || right.officialPrice)?.minimumCny ?? Number.POSITIVE_INFINITY;
+      return signal(left) - signal(right) || lp - rp || left.trimId.localeCompare(right.trimId);
+    });
+    const trim = rankedTrims[0];
     if (!trim) {
       addWarning({
         code: "no_exact_trim",
@@ -568,21 +557,28 @@ export async function researchCars(
       });
       continue;
     }
-    let configuration: CallResult<DongchediConfigurationData> | undefined;
-    if (configurationAttempts < limits.exactConfigurations) {
+    const configurations = new Map<string, CallResult<DongchediConfigurationData>>();
+    // Spend the bounded configuration budget across several likely trims. This
+    // allows a mid/high trim to win when the low trim lacks a hard requirement.
+    for (const item of rankedTrims.slice(0, Math.max(1, limits.exactConfigurations - configurationAttempts))) {
+      if (configurationAttempts >= limits.exactConfigurations) break;
       configurationAttempts += 1;
-      configuration = await call<DongchediConfigurationData>(
+      const fetched = await call<DongchediConfigurationData>(
         "dongchedi",
         "get-trim-configuration",
-        { trimId: trim.trimId },
+        { trimId: item.trimId },
       );
-      if (configuration.data) {
-        configuredTrims += 1;
-      }
+      configurations.set(item.trimId, fetched);
+      if (fetched.data) configuredTrims += 1;
     }
+    const requestedAdas = brief.criteria.some((criterion) => criterion.key.startsWith("drivingAssistance"));
+    const selectedTrim = requestedAdas
+      ? rankedTrims.find((item) => configurations.get(item.trimId)?.data?.drivingAssistance != null) ?? trim
+      : trim;
+    const configuration = configurations.get(selectedTrim.trimId);
     const exactConfiguration = configuration?.data;
     const vehiclePrice = parsePriceRangeCny(
-      trim.dealerPrice || trim.ownerPrice || trim.officialPrice,
+      selectedTrim.dealerPrice || selectedTrim.ownerPrice || selectedTrim.officialPrice,
     );
     const sourceEvidenceIds = unique([
       ...draft.evidenceIds,
@@ -594,7 +590,7 @@ export async function researchCars(
     const onRoadCost = calculateOnRoadCost({
       market: brief.market.city,
       seriesId: draft.dongchedi.seriesId,
-      trimId: trim.trimId,
+      trimId: selectedTrim.trimId,
       ...(vehiclePrice ? { vehicleReferencePrice: vehiclePrice } : {}),
       vehicleEvidenceIds: trims.evidenceIds,
       costEvidence: brief.costEvidence ?? [],
@@ -613,7 +609,7 @@ export async function researchCars(
     });
     const eligibility = candidateEligibility(criterionResults);
     builtCandidates.push({
-      candidateId: `dongchedi:${draft.dongchedi.seriesId}:trim:${trim.trimId}`,
+      candidateId: `dongchedi:${draft.dongchedi.seriesId}:trim:${selectedTrim.trimId}`,
       eligibility,
       series: {
         name: series.data?.name ?? draft.name,
@@ -632,7 +628,7 @@ export async function researchCars(
           trim.sourceUrl,
         ]),
       },
-      trim,
+      trim: selectedTrim,
       alternatives: (trims.data?.items ?? [])
         .filter((item) => item.trimId !== trim.trimId)
         .map((item) => ({
