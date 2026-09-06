@@ -201,6 +201,15 @@ export async function runCli(
         writeJson(stdout, { seriesId: parsed.values["series-id"] ?? null, snapshots });
         return 0;
       }
+      if (subcommand === "feedback-refresh") {
+        const inputFile = parsed.values["input-file"]; const storeDir = parsed.values.store;
+        if (!inputFile || !storeDir) { writeJson(stderr, cliError("invalid_cli_input", "market feedback-refresh requires --input-file and --store")); return 2; }
+        const raw = await readJsonFile(inputFile) as any; const rows = Array.isArray(raw) ? raw : (Array.isArray(raw?.items) ? raw.items : []);
+        const records: any[] = rows.every((x:any) => x?.source === "12365auto" || x?.complaintId !== undefined) ? normalize12365Complaints(rows) : rows;
+        const snapshot: FeedbackSnapshot = { id: `feedback-${now().toISOString().replace(/[:.]/g, "-")}`, capturedAt: now().toISOString(), records, sourceEvidenceIds: [...new Set(records.flatMap((x:any) => (x.evidenceIds ?? []) as string[]))] };
+        const store = createFileFeedbackSnapshotStore(storeDir); const previous = (await store.list()).at(-1); await store.save(snapshot);
+        writeJson(stdout, { snapshot, diff: diffFeedbackSnapshots(previous, snapshot), clusters: clusterFeedback(records) }); return 0;
+      }
       if (subcommand === "feedback-snapshot") {
         const inputFile = parsed.values["input-file"]; const storeDir = parsed.values.store;
         if (!inputFile || !storeDir) { writeJson(stderr, cliError("invalid_cli_input", "market feedback-snapshot requires --input-file and --store")); return 2; }
@@ -236,7 +245,7 @@ export async function runCli(
         writeJson(stdout, { event: detectMarketEvent(before, after) ?? null });
         return 0;
       }
-      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot, refresh, diff, timeline, feedback, feedback-snapshot and feedback-diff"));
+      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot, refresh, diff, timeline, feedback, feedback-snapshot, feedback-refresh and feedback-diff"));
       return 2;
     }
 
