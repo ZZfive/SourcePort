@@ -38,6 +38,7 @@ import {
 import { DongchediAdapter } from "@sourceport/dongchedi";
 import { Kr36Adapter } from "@sourceport/kr36";
 import { SamrAdapter } from "@sourceport/samr";
+import { Auto12365Adapter } from "@sourceport/12365auto";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
@@ -103,6 +104,7 @@ export function createDefaultRegistry(): SourceRegistry {
   registry.register(new BraveSearchAdapter({ openCliCommand }));
   registry.register(new Kr36Adapter(openCliCommand));
   registry.register(new SamrAdapter({ openCliCommand }));
+  registry.register(new Auto12365Adapter(openCliCommand));
   registry.register(new XiaohongshuAdapter(openCliCommand));
   return registry;
 }

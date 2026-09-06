@@ -17,7 +17,8 @@
     "@sourceport/dongchedi": "*",
     "@sourceport/kr36": "*",
     "@sourceport/samr": "*",
-    "@sourceport/xiaohongshu": "*"
+    "@sourceport/xiaohongshu": "*",
+    "@sourceport/12365auto": "*"
   },
   "devDependencies": {
     "@sourceport/testing": "*"

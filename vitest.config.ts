@@ -34,6 +34,9 @@ export default defineConfig({
       "@sourceport/samr": fileURLToPath(
         new URL("./sources/samr/src/index.ts", import.meta.url),
       ),
+      "@sourceport/12365auto": fileURLToPath(
+        new URL("./sources/12365auto/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

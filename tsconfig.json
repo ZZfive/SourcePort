@@ -14,6 +14,12 @@
       "path": "./packages/decision-context"
     },
     {
+      "path": "./packages/market-intelligence"
+    },
+    {
+      "path": "./packages/market-feedback"
+    },
+    {
       "path": "./packages/cli"
     },
     {
@@ -33,6 +39,9 @@
     },
     {
       "path": "./sources/samr"
+    },
+    {
+      "path": "./sources/12365auto"
     }
   ]
 }
