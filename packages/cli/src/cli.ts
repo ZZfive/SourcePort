@@ -307,6 +307,7 @@ export async function runCli(
           "report-file": { type: "string" },
           format: { type: "string", default: "json" },
           "corpus-file": { type: "string" },
+          "feedback-file": { type: "string" },
         },
       });
       const reportFile = parsed.values["report-file"];
@@ -333,6 +334,15 @@ export async function runCli(
         now,
       });
       const corpus = await collectDecisionContext(brief, { execute: executor, now });
+      const feedbackFile = parsed.values["feedback-file"];
+      if (feedbackFile) {
+        const documents = Array.isArray((corpus as any).documents) ? (corpus as any).documents : [];
+        const records = documents.filter((doc: any) => doc.source === "12365auto" || doc.sourceOperation === "search-complaints")
+          .map((doc: any) => ({ complaintId: doc.sourceItemId, brand: String(doc.brand ?? "unknown"), series: String(doc.title ?? "").replace(/\s+complaint.*$/i, ""), summary: String(doc.content ?? doc.summary ?? ""), categories: [], submittedAt: doc.publishedAt, url: doc.url, evidenceId: doc.evidenceIds?.[0] }))
+          .filter((record: any) => record.complaintId && record.series && record.summary);
+        const clusters = clusterFeedback(normalize12365Complaints(records));
+        await saveJsonFile(feedbackFile, clusters);
+      }
       await saveJsonFile(parsed.values["corpus-file"], corpus);
       if (parsed.values.format === "md") stdout(renderDecisionCorpusMarkdown(corpus));
       else writeJson(stdout, corpus);
