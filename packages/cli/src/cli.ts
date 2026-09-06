@@ -41,7 +41,7 @@ import { Kr36Adapter } from "@sourceport/kr36";
 import { SamrAdapter } from "@sourceport/samr";
 import { Auto12365Adapter } from "@sourceport/12365auto";
 import { createFileSnapshotStore, detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
-import { clusterFeedback, normalize12365Complaints } from "@sourceport/market-feedback";
+import { clusterFeedback, normalize12365Complaints, createFileFeedbackSnapshotStore, diffFeedbackSnapshots, type FeedbackSnapshot } from "@sourceport/market-feedback";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
@@ -194,6 +194,19 @@ export async function runCli(
         writeJson(stdout, { seriesId: parsed.values["series-id"] ?? null, snapshots });
         return 0;
       }
+      if (subcommand === "feedback-snapshot") {
+        const inputFile = parsed.values["input-file"]; const storeDir = parsed.values.store;
+        if (!inputFile || !storeDir) { writeJson(stderr, cliError("invalid_cli_input", "market feedback-snapshot requires --input-file and --store")); return 2; }
+        const raw = await readJsonFile(inputFile) as any; const rows = Array.isArray(raw) ? raw : (Array.isArray(raw?.items) ? raw.items : []);
+        const records: any[] = rows.every((x:any) => x?.source === "12365auto" || x?.complaintId !== undefined) ? normalize12365Complaints(rows) : rows;
+        const snapshot: FeedbackSnapshot = { id: `feedback-${now().toISOString().replace(/[:.]/g, "-")}`, capturedAt: now().toISOString(), records, sourceEvidenceIds: [...new Set(records.flatMap((x:any) => (x.evidenceIds ?? []) as string[]))] };
+        await createFileFeedbackSnapshotStore(storeDir).save(snapshot); writeJson(stdout, snapshot); return 0;
+      }
+      if (subcommand === "feedback-diff") {
+        const beforeFile = parsed.values.before; const afterFile = parsed.values.after;
+        if (!beforeFile || !afterFile) { writeJson(stderr, cliError("invalid_cli_input", "market feedback-diff requires --before and --after")); return 2; }
+        const before = await readJsonFile(beforeFile) as FeedbackSnapshot; const after = await readJsonFile(afterFile) as FeedbackSnapshot; writeJson(stdout, diffFeedbackSnapshots(before, after)); return 0;
+      }
       if (subcommand === "feedback") {
         const inputFile = parsed.values["input-file"];
         if (!inputFile) { writeJson(stderr, cliError("invalid_cli_input", "market feedback requires --input-file")); return 2; }
@@ -216,7 +229,7 @@ export async function runCli(
         writeJson(stdout, { event: detectMarketEvent(before, after) ?? null });
         return 0;
       }
-      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot and diff"));
+      writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot, diff, timeline, feedback, feedback-snapshot and feedback-diff"));
       return 2;
     }
 

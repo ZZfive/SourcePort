@@ -39,3 +39,16 @@ export function clusterFeedback(records: readonly FeedbackRecord[]): FeedbackClu
   for (const record of records) { const topic = canonicalTopic(record); const key = `${normalize(record.brand)}:${normalize(record.series)}:${topic}`; groups.set(key,[...(groups.get(key) ?? []),record]); }
   return [...groups].map(([key, items]) => { const first=items.map(x=>x.submittedAt).filter(Boolean).sort()[0]; const last=items.map(x=>x.submittedAt).filter(Boolean).sort().at(-1); const sources=new Set(items.map(x=>x.source)); const resolved=items.some(x=>/解决|修复|完成整改|召回/.test(x.manufacturerResponse ?? "")); const officialUnresolved=items.some(x=>x.officialConfirmed && (x.severity === "high" || /安全|自燃|热失控|制动/.test(x.summary)) && !/解决|修复|完成整改|召回/.test(x.manufacturerResponse ?? "")); const signal=feedbackSignal(items); return { id:`feedback:${key}`,brand:items[0]!.brand,series:items[0]!.series,modelYears:[...new Set(items.map(x=>x.modelYear).filter((x):x is string=>Boolean(x)))],trimIds:[...new Set(items.map(x=>x.trimId).filter((x):x is string=>Boolean(x)))],topic:key.split(":").at(-1) ?? "unknown",records:items,...(first ? {firstSeenAt:first} : {}),...(last ? {lastSeenAt:last} : {}),sourceCount:sources.size,signal,rationale:`${items.length} records from ${sources.size} source(s); official unresolved high-severity=${officialUnresolved}; manufacturer resolution=${resolved}`,evidenceIds:[...new Set(items.flatMap(x=>x.evidenceIds))]}; });
 }
+
+export interface FeedbackSnapshot { id: string; capturedAt: string; records: FeedbackRecord[]; sourceEvidenceIds: string[]; }
+export interface FeedbackSnapshotStore { save(snapshot: FeedbackSnapshot): Promise<void>; list(): Promise<FeedbackSnapshot[]>; }
+export function createFileFeedbackSnapshotStore(directory: string): FeedbackSnapshotStore {
+  return {
+    async save(snapshot) { const { mkdir, writeFile } = await import("node:fs/promises"); await mkdir(directory, { recursive: true }); const safe = snapshot.id.replace(/[^a-zA-Z0-9._-]/g, "_"); await writeFile(`${directory}/${safe}.json`, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8"); },
+    async list() { const { readdir, readFile } = await import("node:fs/promises"); let names: string[]; try { names = await readdir(directory); } catch { return []; } const out: FeedbackSnapshot[] = []; for (const name of names.filter(x => x.endsWith(".json"))) { try { out.push(JSON.parse(await readFile(`${directory}/${name}`, "utf8")) as FeedbackSnapshot); } catch {} } return out.sort((a,b) => a.capturedAt.localeCompare(b.capturedAt)); }
+  };
+}
+export function diffFeedbackSnapshots(before: FeedbackSnapshot | undefined, after: FeedbackSnapshot): { added: FeedbackRecord[]; removed: FeedbackRecord[] } {
+  const oldIds = new Set((before?.records ?? []).map(x => x.id)); const newIds = new Set(after.records.map(x => x.id));
+  return { added: after.records.filter(x => !oldIds.has(x.id)), removed: (before?.records ?? []).filter(x => !newIds.has(x.id)) };
+}
