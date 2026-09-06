@@ -112,7 +112,7 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
     report.marketChanges.forEach((change) => lines.push(`| ${cell(change.seriesId)} | ${cell(change.kind)} | ${cell(change.summary)} | ${cell(change.evidenceIds.join(", "))} |`));
   }
   if (report.feedbackClusters?.length) {
-    lines.push("", "## User feedback and complaints", "", "| Series | Topic | Signal | Rationale | Evidence |", "|---|---|---|---|---|");
+    lines.push("", "## User feedback and complaints", "", "| Series | Topic | Signal | Years | Trims | Sources | Trend | Rationale | Evidence |", "|---|---|---|---|---|---|---|---|---|");
     report.feedbackClusters.forEach((cluster) => lines.push(`| ${cell(cluster.series)} | ${cell(cluster.topic)} | ${cell(cluster.signal)} | ${cell((cluster.modelYears ?? []).join(", "))} | ${cell((cluster.trimIds ?? []).join(", "))} | ${cell(String(cluster.sourceCount ?? ""))} | ${cell([cluster.firstSeenAt, cluster.lastSeenAt].filter(Boolean).join(" -> "))} | ${cell(cluster.rationale)} | ${cell(cluster.evidenceIds.join(", "))} |`));
   }
   if (report.recommendation) {
