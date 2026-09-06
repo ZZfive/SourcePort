@@ -41,7 +41,12 @@ export function enrichCarResearchReport(
     summary: event.changes.map((change) => `${change.field}: ${String(change.before ?? "new")} -> ${String(change.after ?? "removed")}`).join("; "),
     evidenceIds: event.evidenceIds,
   }));
-  const feedback = (input.feedbackClusters ?? []).filter((cluster) => candidateSeries.has(cluster.series)).map((cluster) => ({
+  const feedback = (input.feedbackClusters ?? []).filter((cluster) => {
+    const candidates = report.candidates.filter((candidate) => candidate.series.name === cluster.series);
+    if (!candidates.length) return false;
+    if (!cluster.trimIds.length) return true;
+    return candidates.some((candidate) => cluster.trimIds.includes(candidate.trim.trimId));
+  }).map((cluster) => ({
     series: cluster.series,
     topic: cluster.topic,
     signal: cluster.signal,
