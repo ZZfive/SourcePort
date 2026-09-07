@@ -15,7 +15,8 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "test:live": "vitest run --config vitest.live.config.ts --passWithNoTests"
+    "test:live": "vitest run --config vitest.live.config.ts --passWithNoTests",
+    "install:12365auto": "mkdir -p ~/.opencli/clis/12365auto && cp integrations/opencli/12365auto/*.js ~/.opencli/clis/12365auto/ && opencli validate 12365auto"
   },
   "devDependencies": {
     "@jackwener/opencli": "1.8.6",
