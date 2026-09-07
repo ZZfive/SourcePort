@@ -1,0 +1,6 @@
+import { cli, Strategy } from '@jackwener/opencli/registry';
+const BASE = 'https://www.12365auto.com';
+const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+const html = async (url) => { const r = await fetch(url, { headers: { 'user-agent': 'SourcePort/1.0 read-only' } }); if (!r.ok) throw new Error(`12365auto HTTP ${r.status}`); return await r.text(); };
+const rows = (body, query) => [...body.matchAll(/href=["']([^"']*\/zlts\/[^"']*)["'][^>]*>([^<]{2,120})</gi)].map((m) => ({ complaintId: (m[1].match(/(\d+)/)?.[1] ?? ''), brand: '', series: clean(query), model: '', summary: clean(m[2]), submittedAt: '', status: 'unknown', url: new URL(m[1], BASE).href })).filter(x => x.complaintId);
+cli({ site:'12365auto', name:'complaint', description:'Retrieve one public 12365auto complaint (read-only)', access:'read', domain:'12365auto', strategy:Strategy.PUBLIC, browser:false, args:[{name:'complaint', positional:true, required:true, help:'Complaint id'},{name:'limit',type:'int',default:20,help:'Maximum rows (1-50)'}], columns:['complaintId','brand','series','model','summary','submittedAt','status','url'], func:async ({complaint}) => { const body=await html(`${BASE}/zlts/${complaint}.shtml`); const out=rows(body, complaint).slice(0,1); if(!out.length) throw new Error('12365auto returned no usable complaints'); return out; } });
