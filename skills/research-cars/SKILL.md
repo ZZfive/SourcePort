@@ -26,12 +26,20 @@ report; context flags are advisory and never auto-reject a candidate.
    - mark ranking wishes as `preference` in the user's stated priority order;
    - mark usage facts such as no private charger as `context` unless the user
      explicitly converts them into an exclusion;
-   - generate at most eight brand or series seeds and treat them as hypotheses,
-     never as evidence;
-   - for an open-ended first pass, prefer five seeds and set explicit limits of
-     eight expanded series, five scanned series, three exact configurations,
-     five final candidates, and three owner reviews per series; increase them
-     only when the added evidence could change the decision;
+   - keep every explicitly named car in the discovery scope, including names
+     that may be aliases, announcements, or presale models; resolve identity
+     with evidence instead of replacing them with familiar models;
+   - treat seeds as hypotheses, never evidence. For open-ended requests,
+     check recent manufacturer announcements and relevant brand catalogues,
+     then retain dated URLs in `discovery.leads` and brand scope in
+     `discovery.brands`; catalogue absence does not prove a car does not exist;
+   - plan evidence limits against the requested coverage and purchase deadline.
+     Defaults are eight seeds, 24 admitted series, eight scanned series,
+     16 global configuration attempts, five displayed candidates, and three
+     owner reviews per series. Configuration attempts run in rounds across
+     series; allow additional rounds when higher trims can change eligibility.
+     Increase limits within the documented maxima when needed; if a named car
+     remains unscanned, explain the gap rather than silently omitting it;
    - do not invent tax, insurance, registration, dealer-quote, or policy
      evidence.
 5. Read [criteria-and-evidence.md](references/criteria-and-evidence.md) when
@@ -42,7 +50,7 @@ report; context flags are advisory and never auto-reject a candidate.
    parking, sensors, chips, subscriptions, or exact trim availability.
 7. Use Markdown for the user-facing comparison and always retain the complete
    JSON sidecar. Write the brief with the available file-edit mechanism, then
-   run the live car research exactly once:
+   run one live car research pass:
 
    ```bash
    sourceport research-cars --input-file <brief.json> --format md \
@@ -50,6 +58,10 @@ report; context flags are advisory and never auto-reject a candidate.
    ```
 
    Do not repeat live research to switch formats or recover truncated output.
+   Inspect `discoveredSeries`, `evaluatedTrims`, and `allCandidates` before
+   accepting the shortlist. If an explicit user candidate or decisive higher
+   trim remains unexamined, plan a bounded follow-up pass with targeted seeds
+   or larger limits. Preserve each pass and explain the remaining coverage.
 8. Unless the user explicitly excludes background research, run doctors for
    `samr`, `brave-search`, `36kr`, and `xiaohongshu`, then collect context only
    for the final candidates:
@@ -88,7 +100,12 @@ report; context flags are advisory and never auto-reject a candidate.
 - Do not turn a source reference price into a Wuhan transaction or on-road
   price. Treat the budget result as unknown unless all mandatory cost evidence
   is dated and applicable.
-- Do not replace the report's ordering with a hidden score.
+- Do not infer delivery from launch, presale, or on-sale status. Encode the
+  user's deadline as `purchaseTiming.targetDate` or `purchase.deliveryBefore`;
+  only current, exact-trim, local delivery commitments can satisfy it.
+- Do not replace the report's ordering with a hidden score. Within a tied
+  capability preference result, more explicitly requested capabilities with
+  evidence-backed passes rank first; this is coverage, not driving quality.
 - Do not create a sentiment or public-opinion score. Search heat, one complaint,
   or an unrelated supplier event is not a vehicle risk verdict.
 - Treat `context-only`, `watch`, `verify-before-buy`, and `pause` as prompts for
@@ -100,7 +117,8 @@ report; context flags are advisory and never auto-reject a candidate.
 
 Present:
 
-- the bounded candidate set and rejected seeds;
+- the bounded candidate set, rejected exact trims, and all discovered but
+  unresolved, unscanned, or undisplayed cars with reasons;
 - exact trims, not only series names;
 - a criterion-by-criterion result matrix;
 - a separate driving-assistance matrix;

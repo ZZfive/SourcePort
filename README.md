@@ -355,6 +355,25 @@ corpus to prepare a cited assessment and lets the deterministic compiler enforce
 source admission, owner-signal thresholds, supplier applicability, and advisory
 flags.
 
+The discovery ledger includes relevant brand catalogues and dated release
+leads supplied by the consumer. It prioritizes explicit series seeds and leads,
+then admits catalogue cars in rounds across brands. This remains bounded
+coverage, not a whole-market search. Configuration queries share one global
+attempt budget and run in rounds across series; failed attempts count.
+
+`discoveredSeries` records coverage gaps, `evaluatedTrims` retains every listed
+trim and its configuration status, and `allCandidates` retains representatives
+before the five-candidate display cap. Selection follows evaluated criteria,
+including per-capability evidence, rather than the presence of an ADAS object.
+Reference vehicle prices and evidenced on-road totals are separate. Delivery
+deadlines require current, local, exact-trim commitments; launch status is
+insufficient. Unknown hard conditions remain `needs-verification`.
+
+Defaults and maxima, lead attribution, and delivery inputs are documented in
+[criteria and evidence](skills/research-cars/references/criteria-and-evidence.md).
+Follow-up research is appropriate when named cars or decisive trims remain
+unexamined; format conversion does not require another live pass.
+
 ### CLI use
 
 Create <code>brief.json</code>:
@@ -408,7 +427,7 @@ Create <code>brief.json</code>:
     "initialSeeds": 5,
     "expandedSeries": 8,
     "scannedSeries": 5,
-    "exactConfigurations": 3,
+    "exactConfigurations": 10,
     "finalCandidates": 5,
     "ownerReviewsPerSeries": 3
   }

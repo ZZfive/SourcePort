@@ -347,6 +347,20 @@ Skill 会先执行一次纸面数据研究并保存完整 JSON sidecar，再只�
 决策背景。它使用紧凑 corpus 生成带引用的 assessment，并由确定性编译器执行
 来源准入、车主信号阈值、供应商适用性和提示旗标校验。
 
+发现过程会枚举相关品牌目录，并接收消费者提供的带日期、来源链接的新车线索。
+明确车系种子和新车线索优先，其余目录车型跨品牌轮流纳入；这仍是有界覆盖，
+不代表全市场搜索。配置查询跨车系分轮执行，共享全局尝试预算，失败也计入预算。
+
+`discoveredSeries` 保留发现范围和未查原因，`evaluatedTrims` 保留所有已列出款型
+及配置获取状态，`allCandidates` 保留五车展示上限之前的各车系代表款型。
+选款依据条件判定和逐项辅助驾驶证据。裸车参考价与有证据的落地总价分列；
+交付期限需要当前有效、对应城市和精确款型的承诺，上市信息不能替代交付证据。
+硬条件未知时保留 `needs-verification`。
+
+默认预算、上限、新车线索和交付证据格式见
+[条件与证据说明](skills/research-cars/references/criteria-and-evidence.md)。
+用户点名车型或可能改变结论的款型未查完时，应定向补查；转换格式无需重新实时查询。
+
 ### CLI 使用
 
 创建 <code>brief.json</code>：
@@ -400,7 +414,7 @@ Skill 会先执行一次纸面数据研究并保存完整 JSON sidecar，再只�
     "initialSeeds": 5,
     "expandedSeries": 8,
     "scannedSeries": 5,
-    "exactConfigurations": 3,
+    "exactConfigurations": 10,
     "finalCandidates": 5,
     "ownerReviewsPerSeries": 3
   }

@@ -12,12 +12,11 @@ function money(value: number | undefined): string {
 }
 
 function onRoad(candidate: CarCandidate): string {
-  const range = candidate.onRoadCost.range ?? candidate.onRoadCost.estimateRange;
+  const range = candidate.onRoadCost.status === "known" ? candidate.onRoadCost.range : undefined;
   if (!range) {
     return "unknown";
   }
-  const prefix = candidate.onRoadCost.status === "known" ? "" : "estimate ";
-  return `${prefix}${money(range.minimumCny)}–${money(range.maximumCny)}`;
+  return `${money(range.minimumCny)}–${money(range.maximumCny)}`;
 }
 
 function assistanceSummary(candidate: CarCandidate): {
@@ -31,13 +30,20 @@ function assistanceSummary(candidate: CarCandidate): {
     : {};
   const claimed = root["claimedAutomationLevel"] as Record<string, unknown> | null | undefined;
   const capabilities = root["capabilities"] as Record<string, unknown> | undefined;
-  const capabilityText = capabilities
-    ? Object.values(capabilities).flatMap((group) => Array.isArray(group) ? group : [])
-      .map((item) => item as Record<string, unknown>)
-      .filter((item) => item["availability"] !== "unavailable")
-      .map((item) => `${cell(item["label"] ?? item["key"])}:${cell(item["availability"])}`)
-      .join(", ")
-    : "";
+  const domains = root["operatingDomains"] as Record<string, unknown> | undefined;
+  const capabilityLines = new Set<string>();
+  const describe = (value: unknown) => {
+    if (Array.isArray(value)) { value.forEach(describe); return; }
+    if (!value || typeof value !== "object") return;
+    const item = value as Record<string, unknown>;
+    if (typeof item["availability"] === "string") {
+      capabilityLines.add(`${cell(item["label"] ?? item["key"])}:${cell(item["availability"])}${item["configPrice"] ? ` (option price ${cell(item["configPrice"])})` : ""}`);
+      describe(item["options"]);
+    } else Object.values(item).forEach(describe);
+  };
+  describe(capabilities);
+  describe(domains);
+  const capabilityText = [...capabilityLines].join(", ");
   const hardware = root["hardware"] as Record<string, unknown> | undefined;
   const hardwareText = hardware
     ? Object.entries(hardware)
@@ -70,23 +76,34 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
     "",
     "## Candidates",
     "",
-    "| Candidate | Eligibility | Exact trim | Body style | On-road cost | Cross-source | Evidence |",
-    "|---|---|---|---|---|---|---:|",
+    "Source vehicle prices are references only; unknown mandatory costs are not zero. Candidate order applies only to the inspected evidence, not the whole market.",
+    "",
+    "| Candidate | Eligibility | Exact trim | Body style | Vehicle reference (excludes costs) | Verified on-road total | Missing costs | Cross-source | Evidence |",
+    "|---|---|---|---|---|---|---|---|---:|",
   ];
   if (report.candidates.length === 0) {
-    lines.push("| none | | | | | | 0 |");
+    lines.push("| none | | | | | | | | 0 |");
   } else {
     for (const candidate of report.candidates) {
       lines.push(
-        `| ${cell(`${candidate.series.brand} ${candidate.series.name}`)} | ${candidate.eligibility} | ${cell(`${candidate.trim.year} ${candidate.trim.name}`)} | ${cell(candidate.series.bodyStyle ?? "unknown")} | ${onRoad(candidate)} | ${candidate.crossSource.status} | ${candidate.evidenceIds.length} |`,
+        `| ${cell(`${candidate.series.brand} ${candidate.series.name}`)} | ${candidate.eligibility} | ${cell(`${candidate.trim.year} ${candidate.trim.name}`)} | ${cell(candidate.series.bodyStyle ?? "unknown")} | ${cell(candidate.trim.dealerPrice || candidate.trim.ownerPrice || candidate.trim.officialPrice) || "unknown"} | ${onRoad(candidate)} | ${cell(candidate.onRoadCost.missingComponents.join(", ")) || "none"} | ${candidate.crossSource.status} | ${candidate.evidenceIds.length} |`,
       );
     }
   }
+  if (report.discoveredSeries?.length) {
+    lines.push("", "## Discovery ledger", "", "| Series | Origins | State | Reason | Evidence |", "|---|---|---|---|---|");
+    for (const item of report.discoveredSeries) lines.push(`| ${cell(`${item.brand} ${item.name}`)} | ${cell(item.origins.join(", "))} | ${item.status} | ${cell(item.reason)} | ${cell(item.evidenceIds.join(", "))} |`);
+  }
+  if (report.allCandidates?.length) {
+    const displayed = new Set(report.candidates.map((item) => item.candidateId));
+    lines.push("", "## All series representatives (before display limit)", "", "| Series | Exact trim | Eligibility | Configuration | Display |", "|---|---|---|---|---|");
+    for (const item of report.allCandidates) lines.push(`| ${cell(item.series.name)} | ${cell(`${item.trim.year} ${item.trim.name}`)} | ${item.eligibility} | ${item.configurationStatus ?? "unknown"} | ${displayed.has(item.candidateId) ? "shown" : item.eligibility === "rejected" ? "hard condition failed" : "presentation limit"} |`);
+  }
   lines.push("", "## Criterion matrix", "", "| Candidate | Criterion | Kind | Result | Explanation | Evidence |", "|---|---|---|---|---|---|");
-  for (const candidate of [...report.candidates, ...report.rejected]) {
+  for (const candidate of report.evaluatedTrims ?? [...report.candidates, ...report.rejected]) {
     for (const criterion of candidate.criterionResults) {
       lines.push(
-        `| ${cell(candidate.series.name)} | ${cell(criterion.criterion.label)} | ${criterion.criterion.kind} | ${criterion.status} | ${cell(criterion.message)} | ${cell(criterion.evidenceIds.join(", ")) || "none"} |`,
+        `| ${cell(`${candidate.series.name} ${candidate.trim.year} ${candidate.trim.name}`)} | ${cell(criterion.criterion.label)} | ${criterion.criterion.kind} | ${criterion.status} | ${cell(criterion.message)} | ${cell(criterion.evidenceIds.join(", ")) || "none"} |`,
       );
     }
   }
@@ -94,7 +111,7 @@ export function renderCarResearchMarkdown(report: CarResearchReport): string {
   for (const candidate of report.candidates) {
     const assistance = assistanceSummary(candidate);
     lines.push(
-      `| ${cell(candidate.series.name)} | ${assistance.claimedLevel} | ${cell(assistance.capabilities)} | ${cell(assistance.hardware)} | ${cell(assistance.system)} |`,
+      `| ${cell(`${candidate.series.name} ${candidate.trim.year} ${candidate.trim.name}`)} | ${assistance.claimedLevel} | ${cell(assistance.capabilities)} | ${cell(assistance.hardware)} | ${cell(assistance.system)} |`,
     );
   }
   if (report.candidates.some((candidate) => candidate.alternatives?.length)) {

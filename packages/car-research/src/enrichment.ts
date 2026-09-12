@@ -61,10 +61,12 @@ export function enrichCarResearchReport(
   const actions = actionItems(report, freshness, feedback);
   const pause = feedback.find((x) => x.signal === "pause");
   const verify = feedback.find((x) => x.signal === "verify-before-buy" || x.signal === "watch") || (freshness === "stale" || freshness === "aging" ? { signal: "stale", evidenceIds: [] as string[] } : undefined);
+  const ready = report.status === "success" && report.candidates.length > 0 && report.candidates.every((candidate) =>
+    candidate.eligibility === "eligible" && candidate.criterionResults?.filter((item) => item.criterion.kind === "hard").every((item) => item.status === "pass"));
   const recommendation = pause
     ? { status: "pause" as const, rationale: "存在未解决的高严重度官方风险信号", evidenceIds: pause.evidenceIds }
-    : verify
-      ? { status: "verify-before-buy" as const, rationale: "市场反馈或数据时效要求买前核验", evidenceIds: verify.evidenceIds }
+    : verify || !ready
+      ? { status: "verify-before-buy" as const, rationale: "硬条件、检索覆盖、市场反馈或数据时效仍需核验", evidenceIds: verify?.evidenceIds ?? [] }
       : { status: "recommend" as const, rationale: "当前候选满足已知硬条件且没有升级风险信号", evidenceIds: report.candidates.flatMap((c) => c.evidenceIds) };
   return {
     ...report,

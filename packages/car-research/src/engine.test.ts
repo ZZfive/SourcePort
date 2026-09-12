@@ -291,6 +291,6 @@ describe("bounded car research engine", () => {
       expect.objectContaining({ criterion: expect.objectContaining({ key: "budget.onRoad.maxCny" }), status: "fail" }),
     ]));
     expect(report.unsupportedCriteria.map((criterion) => criterion.key)).toEqual(["future.filter"]);
-    expect(report.coverage.limitations.join(" ")).toContain("not a Wuhan dealer quotation");
+    expect(report.coverage.limitations.join(" ")).toContain("source reference prices exclude unverified mandatory costs");
   });
 });

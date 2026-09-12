@@ -131,4 +131,20 @@ describe("Dongchedi get-trim-configuration", () => {
   it("does not accept a different exact trim", () => {
     expect(() => parseDongchediTrimConfiguration(html, "1")).toThrow(/trim identity/);
   });
+
+  it("separates highway and urban sub-options without losing availability or optional price", () => {
+    const next = JSON.parse(html.replace('<script id="__NEXT_DATA__">', '').replace('</script>', ''));
+    const raw = next.props.pageProps.rawData;
+    raw.properties.find((p: { key: string }) => p.key === "navigation_assisted_driving").sub_list = [
+      { key: "navigation_assisted_driving_2", text: "高快领航" },
+      { key: "navigation_assisted_driving_1", text: "城市领航" },
+    ];
+    raw.properties.find((p: { key: string }) => p.key === "navigation_assisted_driving").type = 3;
+    raw.car_info[0].info.navigation_assisted_driving_2 = { value: "高快领航", icon_type: 1, config_price: "" };
+    raw.car_info[0].info.navigation_assisted_driving_1 = { value: "城市领航", icon_type: 2, config_price: "6000元" };
+    const parsed = parseDongchediTrimConfiguration(`<script id="__NEXT_DATA__">${JSON.stringify(next)}</script>`, "255925");
+    expect(parsed.drivingAssistance.operatingDomains.highwayNavigation).toMatchObject({ key: "navigation_assisted_driving_2", availability: "standard" });
+    expect(parsed.drivingAssistance.operatingDomains.urbanNavigation).toMatchObject({ key: "navigation_assisted_driving_1", availability: "optional", configPrice: "6000元" });
+    expect(parsed.configuration.find((p) => p.key === "navigation_assisted_driving")?.options).toHaveLength(2);
+  });
 });

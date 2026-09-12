@@ -47,6 +47,7 @@ Use an open criterion list instead of a fixed universal car-query schema:
 The deterministic MVP recognizes:
 
 - `budget.onRoad.maxCny`;
+- `purchase.deliveryBefore` (inclusive `YYYY-MM-DD` or `{ "date": "YYYY-MM-DD" }`);
 - `bodyStyle.preferred`;
 - `drivingAssistance.capabilities`;
 - `drivingAssistance.claimedLevel.min`;
@@ -84,3 +85,70 @@ Do not invent a zero tax, insurance range, registration cost, subsidy, trade-in
 discount, financing discount, or dealer quote. When one required component is
 missing, keep the overall budget result `unknown` even if an estimate range is
 shown.
+
+## Discovery and Query Budgets
+
+The engine enumerates relevant brand catalogues independently of competitor
+links. It does not perform whole-market news search: the consumer must supply
+recent release leads when that matters. Example (illustrative, not evidence):
+
+```json
+{
+  "discovery": {
+    "brands": ["品牌"],
+    "leads": [{
+      "name": "待核实新车", "brand": "品牌", "source": "manufacturer",
+      "sourceUrl": "https://example.org/release",
+      "retrievedAt": "2026-09-12T00:00:00Z", "marketStatus": "announced"
+    }]
+  }
+}
+```
+
+Lead status can be `on-sale`, `presale`, `announced`, or `unknown`; it is a
+supplied claim, not proof of purchasability. Exact series seeds and leads get
+priority; remaining catalogue entries are admitted in rounds across brands.
+`discoveredSeries` records unresolved identities, budget omissions, no trims,
+and scanned series. `evaluatedTrims` retains all listed trims, including failed
+and uninspected configurations. `allCandidates` retains each series representative
+before the display cap. A display cap is not rejection or a coverage guarantee.
+
+| Limit | Default | Maximum |
+| --- | ---: | ---: |
+| initialSeeds | 8 | 64 |
+| expandedSeries | 24 | 256 |
+| scannedSeries | 8 | 64 |
+| exactConfigurations | 16 | 256 |
+| finalCandidates | 5 | 5 |
+| ownerReviewsPerSeries | 3 | 5 |
+
+Configuration failures consume the global attempt budget. A series is not
+rejected merely because its inspected low trim fails while higher trims remain
+unknown. The representative is chosen after criterion evaluation, and its
+alternatives explain acquisition and eligibility status.
+
+## Delivery Evidence
+
+`purchaseTiming.targetDate` generates a hard delivery criterion.
+`budget: { "maximumCny": 150000, "basis": "on-road" }` generates a hard
+on-road ceiling. If either is also specified explicitly, both definitions must
+agree; duplicate criterion keys are rejected.
+
+A delivery record needs `id`, `source`, HTTP(S) `sourceUrl`, `retrievedAt`,
+`validUntil`, local `market`, exact `trimId`, optional `seriesId`, `kind`
+(`commitment` or `estimate`), and `earliestDate` / `latestDate` in `YYYY-MM-DD`.
+Supply actual documented evidence, not invented sample commitments. The engine
+checks scope and validity at report generation time; supplied records remain
+`claimed` provenance until independently verified.
+
+Only a current commitment for the exact trim and market can pass. The latest
+committed date must be on or before the deadline. A wholly later window fails;
+a window crossing the deadline remains unknown. Inconsistent outcomes from
+multiple applicable commitments conflict. Estimates, stale evidence, or
+wrong-city/trim records cannot establish delivery. A commitment is evidence of
+a promise, not a guarantee of the future event.
+
+Required cost components must be marked mandatory. Multiple applicable quotes
+for the same required component need reconciliation and keep the total unknown;
+they are never added as separate expenses. Supplied cost URLs remain `claimed`
+provenance: a URL alone does not establish independent verification.

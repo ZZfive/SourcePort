@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateOnRoadCost, parsePriceRangeCny } from "./price.js";
+import { calculateOnRoadCost, costEvidenceRecord, parsePriceRangeCny } from "./price.js";
 
 describe("car research prices", () => {
   it("parses Chinese ten-thousand-yuan price ranges", () => {
@@ -59,5 +59,26 @@ describe("car research prices", () => {
     expect(result.status).toBe("known");
     expect(result.range).toEqual({ minimumCny: 125500, maximumCny: 132000 });
     expect(result.evidenceIds).toEqual(["vehicle", "tax", "insurance", "registration"]);
+  });
+});
+
+
+describe("cost evidence reconciliation", () => {
+  const costs = (["vehicle-price", "purchase-tax", "insurance", "registration"] as const).map((component) => ({
+    id: component, component, minimumCny: 100, maximumCny: 100, mandatory: true,
+    source: "fixture", retrievedAt: "2026-09-10T00:00:00Z", market: "武汉", applicability: "fixture",
+  }));
+  const input = { market: "武汉", seriesId: "1", trimId: "11", vehicleEvidenceIds: [] };
+  it("does not treat an optional cost as satisfying a required component", () => {
+    const costEvidence = costs.map((cost) => ({ ...cost, mandatory: cost.component !== "insurance" }));
+    expect(calculateOnRoadCost({ ...input, costEvidence })).toMatchObject({ status: "unknown", missingComponents: ["insurance"] });
+  });
+  it("does not sum alternative quotes or publish their sum as an estimate", () => {
+    const result = calculateOnRoadCost({ ...input, costEvidence: [...costs, { ...costs[0]!, id: "second-quote" }] });
+    expect(result.status).toBe("unknown"); expect(result.range).toBeUndefined(); expect(result.estimateRange).toBeUndefined();
+    expect(result.reasons.join(" ")).toContain("reconciliation"); expect(result.evidenceIds).toContain("second-quote");
+  });
+  it("does not label a supplied URL as independently verified", () => {
+    expect(costEvidenceRecord({ ...costs[0]!, sourceUrl: "https://example.org/quote" }).verification).toBe("claimed");
   });
 });

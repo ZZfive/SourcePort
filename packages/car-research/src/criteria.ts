@@ -3,6 +3,7 @@ import type {
   CarCriterion,
   CriterionResult,
   CriterionStatus,
+  DeliveryEvidence,
   OnRoadCost,
 } from "./contracts.js";
 
@@ -13,6 +14,7 @@ export interface CriterionContext {
   budgetEvidenceIds: string[];
   bodyStyleEvidenceIds: string[];
   configurationEvidenceIds: string[];
+  delivery?: { evidence: readonly DeliveryEvidence[]; market: string; seriesId: string; trimId: string; now: string };
 }
 
 type CriterionEvaluator = (criterion: CarCriterion, context: CriterionContext) => CriterionResult;
@@ -52,69 +54,85 @@ function maximumBudget(value: unknown): number | undefined {
   return Number.isFinite(maximum) ? maximum : undefined;
 }
 
+const capabilityAliases: Record<string, string[]> = {
+  "highway-navigation": ["高快领航", "高速领航", "高速领航辅助", "高速导航辅助驾驶", "highwayNavigation", "navigation_assisted_driving_2"],
+  "urban-navigation": ["城市领航", "城市领航辅助", "城区领航", "城市NOA", "urbanNavigation", "navigation_assisted_driving_1"],
+  "adaptive-cruise": ["ACC", "自适应巡航", "全速自适应巡航", "adaptive_cruise", "full_speed_adaptive_cruise"],
+  "lane-centering": ["车道居中", "车道居中保持", "lane_center"],
+  "auto-parking": ["自动泊车", "自动泊车入位", "auto_park_entry"],
+  "active-braking": ["AEB", "主动刹车", "自动紧急制动", "active_brake"],
+};
+const normalized = (value: unknown) => String(value ?? "").normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+function capabilityKey(value: unknown): string {
+  const name = normalized(value);
+  return Object.entries(capabilityAliases).find(([key, aliases]) =>
+    normalized(key) === name || aliases.some((alias) => normalized(alias) === name))?.[0] ?? name;
+}
+
 function availabilityEntries(drivingAssistance: unknown): Array<Record<string, unknown>> {
   const root = object(drivingAssistance);
-  const capabilities = object(root?.["capabilities"]);
-  if (!capabilities) {
-    return [];
-  }
-  return Object.values(capabilities).flatMap((group) =>
-    Array.isArray(group)
-      ? group.filter((item): item is Record<string, unknown> => object(item) !== undefined)
-      : []);
+  const entries: Array<Record<string, unknown>> = [];
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    const record = object(value);
+    if (!record) return;
+    if (typeof record["availability"] === "string") {
+      entries.push(record);
+      visit(record["options"]);
+    } else Object.values(record).forEach(visit);
+  };
+  visit(root?.["capabilities"]);
+  visit(root?.["operatingDomains"]);
+  return entries;
 }
 
 function capabilityEvaluator(criterion: CarCriterion, context: CriterionContext): CriterionResult {
   const wanted = stringList(criterion.requirement);
-  if (wanted.length === 0) {
-    return result(criterion, "conflict", "capability requirement did not contain any names");
-  }
+  if (!wanted.length) return result(criterion, "conflict", "capability requirement did not contain any names");
   const entries = availabilityEntries(context.drivingAssistance);
-  if (entries.length === 0) {
-    return result(
-      criterion,
-      "unknown",
-      "exact-trim driving-assistance capability evidence is unavailable",
-      context.configurationEvidenceIds,
-    );
+  const details = wanted.map((expected) => {
+    const found = entries.filter((entry) => [entry["key"], entry["label"], entry["value"]]
+      .some((value) => value != null && capabilityKey(value) === capabilityKey(expected)) ||
+      (["highway-navigation", "urban-navigation"].includes(capabilityKey(expected)) &&
+        entry["key"] === "navigation_assisted_driving" && entry["availability"] === "unavailable"));
+    const present = found.some((entry) => entry["availability"] === "standard" ||
+      (entry["availability"] === "value" && Boolean(entry["value"])));
+    const absent = found.some((entry) => entry["availability"] === "unavailable");
+    const optional = found.some((entry) => entry["availability"] === "optional");
+    const status: CriterionStatus = present && absent ? "conflict" : present ? "pass" : absent && !optional ? "fail" : "unknown";
+    return { key: expected, status, optional };
+  });
+  const status: CriterionStatus = details.some((item) => item.status === "conflict") ? "conflict"
+    : details.some((item) => item.status === "fail") ? "fail"
+    : details.some((item) => item.status === "unknown") ? "unknown" : "pass";
+  return { ...result(criterion, status,
+    details.map((item) => `${item.key}: ${item.status}${item.optional ? " (optional equipment; inclusion and cost unresolved)" : ""}`).join("; "),
+    context.configurationEvidenceIds), details };
+}
+
+function deliveryEvaluator(criterion: CarCriterion, context: CriterionContext): CriterionResult {
+  const target = object(criterion.requirement)?.["date"] ?? criterion.requirement;
+  if (typeof target !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(target) ||
+      !Number.isFinite(Date.parse(target)) || new Date(target).toISOString().slice(0, 10) !== target) {
+    return result(criterion, "conflict", "delivery deadline must be a valid YYYY-MM-DD date (inclusive)");
   }
-  const normalized = (value: unknown) => String(value ?? "").normalize("NFKC").toLowerCase();
-  const missing: string[] = [];
-  const optional: string[] = [];
-  for (const expected of wanted) {
-    const found = entries.find((entry) => {
-      const haystack = `${normalized(entry["key"])} ${normalized(entry["label"])} ${normalized(entry["value"])}`;
-      return haystack.includes(normalized(expected));
-    });
-    if (!found || found["availability"] === "unknown") {
-      missing.push(expected);
-    } else if (found["availability"] === "unavailable") {
-      return result(
-        criterion,
-        "fail",
-        `exact trim marks '${expected}' unavailable`,
-        context.configurationEvidenceIds,
-      );
-    } else if (found["availability"] === "optional") {
-      optional.push(expected);
-    }
-  }
-  if (missing.length > 0) {
-    return result(
-      criterion,
-      "unknown",
-      `capability evidence did not resolve: ${missing.join(", ")}`,
-      context.configurationEvidenceIds,
-    );
-  }
-  return result(
-    criterion,
-    "pass",
-    optional.length > 0
-      ? `capabilities are available but optional: ${optional.join(", ")}`
-      : "all requested capabilities are present on the exact trim",
-    context.configurationEvidenceIds,
-  );
+  const delivery = context.delivery;
+  const assessed = delivery?.evidence.map((item) => ({ item, reasons: [
+    ...(item.kind !== "commitment" ? ["estimate, not commitment"] : []),
+    ...(item.market !== delivery.market ? ["different market"] : []),
+    ...(item.trimId !== delivery.trimId ? ["different trim"] : []),
+    ...(item.seriesId && item.seriesId !== delivery.seriesId ? ["different series"] : []),
+    ...(!(Date.parse(item.retrievedAt) <= Date.parse(delivery.now) && Date.parse(item.validUntil) >= Date.parse(delivery.now)) ? ["not current"] : []),
+  ] })) ?? [];
+  const applicable = assessed.filter((entry) => !entry.reasons.length).map((entry) => entry.item);
+  const ignored = assessed.filter((entry) => entry.reasons.length)
+    .map((entry) => `${entry.item.id}: ${entry.reasons.join(", ")}`).join("; ");
+  const suffix = ignored ? `; excluded evidence: ${ignored}` : "";
+  const ids = assessed.map((entry) => entry.item.id);
+  if (!applicable.length) return result(criterion, "unknown", `no current, documented delivery commitment for this exact trim and market; on-sale and presale status do not prove delivery${suffix}`, ids);
+  const statuses = applicable.map((item) => item.latestDate <= target ? "pass" : item.earliestDate > target ? "fail" : "unknown");
+  const status = new Set(statuses).size > 1 ? "conflict" : statuses[0]!;
+  return result(criterion, status, `delivery by ${target}: ${applicable.map((item) => `${item.earliestDate}–${item.latestDate}`).join("; ")}${suffix}`, ids);
 }
 
 function claimedLevelNumber(value: unknown): number | undefined {
@@ -123,6 +141,7 @@ function claimedLevelNumber(value: unknown): number | undefined {
 }
 
 const evaluators = new Map<string, CriterionEvaluator>([
+  ["purchase.deliveryBefore", deliveryEvaluator],
   ["budget.onRoad.maxCny", (criterion, context) => {
     const maximum = maximumBudget(criterion.requirement);
     if (maximum === undefined) {
@@ -277,6 +296,12 @@ export function compareCandidates(left: CarCandidate, right: CarCandidate): numb
     if (difference !== 0) {
       return difference;
     }
+    // Explicit, unweighted coverage of the user's requested capabilities is a
+    // tie-breaker within this preference, not a vehicle quality score.
+    const passed = (item: CriterionResult | undefined) =>
+      item?.details?.filter((detail) => detail.status === "pass").length ?? 0;
+    const capabilityCoverage = passed(rightResult) - passed(leftResult);
+    if (capabilityCoverage !== 0) return capabilityCoverage;
   }
   if (left.evidenceCompleteness !== right.evidenceCompleteness) {
     return right.evidenceCompleteness - left.evidenceCompleteness;

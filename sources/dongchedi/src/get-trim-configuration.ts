@@ -264,9 +264,11 @@ export function parseDongchediTrimConfiguration(
     drivingAssistance: {
       claimedAutomationLevel: capability("automatic_drive_level"),
       operatingDomains: {
-        highwayNavigation: capability("navigation_assisted_driving"),
+        highwayNavigation: capability("navigation_assisted_driving_2") ??
+          (capability("navigation_assisted_driving")?.availability === "unavailable"
+            ? capability("navigation_assisted_driving") : null),
         ramp: capability("auto_road_out_in"),
-        urbanNavigation: null,
+        urbanNavigation: capability("navigation_assisted_driving_1"),
         parking: capability("auto_park_entry"),
       },
       capabilities: {

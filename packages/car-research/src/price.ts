@@ -44,7 +44,7 @@ export function costEvidenceRecord(evidence: CostEvidence): EvidenceRecord {
     ...(evidence.sourceUrl ? { sourceUrl: evidence.sourceUrl } : {}),
     ...(evidence.market ? { market: evidence.market } : {}),
     fragment: evidence,
-    verification: evidence.sourceUrl ? "source-verified" : "claimed",
+    verification: "claimed",
   };
 }
 
@@ -106,7 +106,10 @@ export function calculateOnRoadCost(input: {
     });
   }
 
-  const present = new Set(applicable.map((evidence) => evidence.component));
+  const mandatoryEvidence = applicable.filter((evidence) => evidence.mandatory);
+  const present = new Set(mandatoryEvidence.map((evidence) => evidence.component));
+  const duplicateComponents = REQUIRED_COMPONENTS.filter((component) =>
+    mandatoryEvidence.filter((evidence) => evidence.component === component).length > 1);
   const missingComponents = REQUIRED_COMPONENTS.filter((component) => !present.has(component));
   const mandatoryComponents = components.filter((component) => component.component !== "vehicle-reference")
     .filter((component) => {
@@ -127,12 +130,15 @@ export function calculateOnRoadCost(input: {
   if (!present.has("vehicle-price") && input.vehicleReferencePrice) {
     reasons.push("vehicle price is a source reference, not a verified Wuhan transaction price");
   }
-  const known = missingComponents.length === 0;
+  if (duplicateComponents.length) {
+    reasons.push(`multiple applicable quotes require reconciliation, not addition: ${duplicateComponents.join(", ")}`);
+  }
+  const known = missingComponents.length === 0 && duplicateComponents.length === 0;
   const evidenceIds = [...new Set(components.flatMap((component) => component.evidenceIds))];
   return {
     status: known ? "known" : "unknown",
     ...(known ? { range: sumRanges(mandatoryComponents) } : {}),
-    ...(estimateComponents.length > 0 ? { estimateRange: sumRanges(estimateComponents) } : {}),
+    ...(estimateComponents.length > 0 && duplicateComponents.length === 0 ? { estimateRange: sumRanges(estimateComponents) } : {}),
     components,
     missingComponents,
     reasons,

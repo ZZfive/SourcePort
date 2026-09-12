@@ -27,3 +27,16 @@ Do not transfer a capability from a higher trim, a different model year, a
 vendor marketing page, or the series as a whole to the selected trim. If a
 feature depends on a package, subscription, regional rollout, or OTA version,
 state that dependency next to the claim.
+
+The evaluator reads both `capabilities` and `operatingDomains`, including
+nested `options`. It uses explicit aliases, including 高快领航 / 高速领航辅助
+and 城市领航 / 城市NOA. It does not equate highway and urban navigation,
+lane keeping and lane centering, or generic ADAS and HUAWEI ADS. Generic
+navigation absence is negative evidence for both navigation domains.
+
+An optional feature remains `unknown` for base-trim eligibility until inclusion
+and applicable cost are resolved; an option price does not prove it is included.
+Contradictory standard/unavailable evidence is `conflict`. Per-capability
+`details` must remain visible even when the combined criterion fails. If two
+capability preference results tie, the candidate with more requested
+capabilities explicitly passing ranks first before lower-priority preferences.
