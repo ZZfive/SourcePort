@@ -2,6 +2,8 @@ import type {
   EvidenceRecord,
   RecoveryAction,
   SourceWarning,
+  SourceResult,
+  SourceExecutor,
 } from "@sourceport/core";
 
 export const PROPERTY_RESEARCH_LIMITS = {
@@ -281,6 +283,31 @@ export interface PropertyResearchReport {
 export interface PropertyResearchDependencies {
   now?: () => Date;
   candidates?: unknown;
+}
+
+export interface PropertyDiscoveryRequest {
+  source: string;
+  operation: "search-listings";
+  parameters: {
+    url: string;
+    query: string;
+    kind: PropertyKind;
+    city: string;
+    limit?: number;
+  };
+}
+
+export interface PropertyDiscoveryResult {
+  status: "success" | "partial" | "failed";
+  candidates: PropertyCandidateInput[];
+  sourceResults: SourceResult[];
+  warnings: SourceWarning[];
+  recoveryActions: RecoveryAction[];
+}
+
+export interface PropertyDiscoveryDependencies {
+  execute: SourceExecutor;
+  now?: () => Date;
 }
 
 export function resolvedPropertyLimits(input?: PropertyResearchBrief["limits"]): PropertyResearchLimits {

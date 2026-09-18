@@ -327,6 +327,46 @@ describe("SourcePort CLI", () => {
     }
   });
 
+  it("discovers property candidates from explicit listing queries", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sourceport-property-discover-cli-"));
+    const briefFile = join(directory, "brief.json");
+    const discoveryFile = join(directory, "discovery.json");
+    const outputFile = join(directory, "candidates.json");
+    const brief = {
+      query: "示例城市买房",
+      market: { city: "示例城市" },
+      housingTypes: ["new", "resale"],
+      budget: { maximumAllInCny: 2_000_000, basis: "all-in" },
+      commuteAnchors: [{ id: "destinationA", label: "通勤目的地 A" }],
+    };
+    await writeFile(briefFile, JSON.stringify(brief), "utf8");
+    await writeFile(discoveryFile, JSON.stringify([{ source: "fixture-listings", operation: "search-listings", parameters: { url: "https://listings.example.test/search", query: "示例区域", kind: "new", city: "示例城市", limit: 5 } }]), "utf8");
+    const execute: SourceExecutor = async (request) => ({
+      requestId: request.requestId ?? "discover",
+      source: request.source,
+      operation: request.operation,
+      operationSchemaVersion: "1.0.0",
+      status: "success",
+      data: { query: "示例区域", kind: "new", items: [{ candidateId: "lead-1", kind: "new", city: "示例城市", community: "测试项目", title: "测试项目", sourceUrl: "https://listings.example.test/lead-1", retrievedAt: "2026-09-18T00:00:00Z", priceCny: { minimumCny: 1_500_000, maximumCny: 1_500_000 }, evidenceStatus: "lead-only" }] },
+      evidence: [{ id: "e1", source: request.source, operation: request.operation, backend: "fixture", retrievedAt: "2026-09-18T00:00:00Z", sourceUrl: "https://listings.example.test/search", verification: "source-verified" }],
+      warnings: [],
+      recoveryActions: [],
+    });
+    try {
+      const output = capture();
+      const exitCode = await runCli(["property-discover", "--input-file", briefFile, "--discovery-file", discoveryFile, "--output-file", outputFile], { researchExecutor: execute, ...output.io });
+      expect(exitCode).toBe(0);
+      expect(JSON.parse(await readFile(outputFile, "utf8"))).toEqual(expect.objectContaining({ candidates: [expect.objectContaining({ candidateId: "fixture-listings:lead-1", community: "测试项目", city: "示例城市" })] }));
+      expect(output.stderr).toEqual([]);
+      const researchOutput = capture();
+      const researchExit = await runCli(["research-property", "--input-file", briefFile, "--candidates-file", outputFile, "--format", "md"], { ...researchOutput.io });
+      expect(researchExit).toBe(1);
+      expect(researchOutput.stdout.join("")).toContain("测试项目");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("collects and compiles decision context with JSON sidecars", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sourceport-context-cli-"));
     const briefFile = join(directory, "context-brief.json");

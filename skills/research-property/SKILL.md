@@ -61,6 +61,18 @@ sourceport research-property \
   --report-file property-report.json
 ```
 
+To acquire listing leads first, provide an explicit private discovery file.
+Each entry names the source operation, URL, query, housing kind, city, and
+limit. The command writes normalized candidates plus source evidence and
+recovery diagnostics:
+
+```bash
+sourceport property-discover \
+  --input-file private/property-brief.json \
+  --discovery-file private/property-discovery.json \
+  --output-file private/property-candidates.json
+```
+
 Probe current Wuhan official policy evidence separately before using it in a
 candidate report:
 

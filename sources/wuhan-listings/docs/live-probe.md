@@ -11,6 +11,9 @@ sourceport run wuhan-listings search-listings \
   --input '{"url":"https://wuhan.fang.com/","query":"property listings","kind":"new","city":"<source market>","limit":5}'
 ```
 
+The `city` parameter is supplied by the caller and must match the market
+represented by the requested source URL. It is not a user profile default.
+
 The current public route is the Wuhan Fang.com portal. Lianjia/Beike hosts are
 allowlisted for explicitly supplied listing URLs, but their access state is
 reported independently. In the current environment, `search-listings` is

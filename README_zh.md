@@ -444,6 +444,15 @@ sourceport research-property \
   --report-file property-report.json
 ~~~
 
+也可以先从指定站点获取挂牌线索，再输出标准候选文件：
+
+~~~bash
+sourceport property-discover \
+  --input-file private/property-brief.json \
+  --discovery-file private/property-discovery.json \
+  --output-file private/property-candidates.json
+~~~
+
 ### 决策背景工作流
 
 汽车便捷命令只从最多五个最终、非 rejected 候选生成通用

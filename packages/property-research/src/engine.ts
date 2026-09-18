@@ -39,7 +39,7 @@ function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBr
   const actionItems = [
     ...(allInCost.status !== "known" ? ["核验交易价、税费、中介费、维修基金、装修和车位等总包组成"] : []),
     ...(input.kind === "new" ? ["核验项目、楼栋和房号对应的预售许可证、交付时间和备案合同"] : ["核验不动产权证、抵押/查封/租赁、卖方主体和存量房评估价"]),
-    ...(commuteValues.length < brief.commuteAnchors.length ? ["补齐两个通勤锚点的同口径路线证据、出行方式和时段"] : []),
+    ...(commuteValues.length < brief.commuteAnchors.length ? [`补齐${brief.commuteAnchors.length}个通勤锚点的同口径路线证据、出行方式和时段`] : []),
   ];
   return {
     candidateId: input.candidateId,
@@ -47,7 +47,7 @@ function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBr
     kind: input.kind,
     identity: { city: input.city, ...(input.district ? { district: input.district } : {}), community: input.community, ...(input.address ? { address: input.address } : {}), ...(input.building ? { building: input.building } : {}), ...(input.unit ? { unit: input.unit } : {}), ...(input.room ? { room: input.room } : {}) },
     attributes: { ...(input.areaSqm === undefined ? {} : { areaSqm: input.areaSqm }), ...(input.bedrooms === undefined ? {} : { bedrooms: input.bedrooms }), ...(input.livingRooms === undefined ? {} : { livingRooms: input.livingRooms }), ...(input.floor ? { floor: input.floor } : {}), ...(input.constructionYear === undefined ? {} : { constructionYear: input.constructionYear }), ...(input.propertyRightsYears === undefined ? {} : { propertyRightsYears: input.propertyRightsYears }), ...(input.developer ? { developer: input.developer } : {}), ...(input.deliveryDate ? { deliveryDate: input.deliveryDate } : {}) },
-    listings: [...(input.listing ? [input.listing] : []), ...(input.listings ?? [])],
+    listings: [...new Map([...(input.listing ? [input.listing] : []), ...(input.listings ?? [])].map((item) => [item.listingId, item])).values()],
     ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}),
     allInCost,
     financing,
@@ -116,7 +116,7 @@ export async function researchProperties(input: unknown, dependencies: PropertyR
   const warnings: SourceWarning[] = [];
   const recoveryActions: RecoveryAction[] = [];
   const limitations: string[] = [];
-  if (!supplied.length) limitations.push("no normalized candidates matching the requested market were supplied; source discovery is not connected yet");
+  if (!supplied.length) limitations.push("no normalized candidates matching the requested market were supplied; run property-discover or provide a candidates file");
   if (scopeExclusions.length) limitations.push("some normalized candidates were excluded because their city or housing type did not match the brief");
   if (capExclusions.length) limitations.push(`candidate discovery was capped at ${limits.initialCandidates}`);
   if (!capExclusions.length && supplied.length >= limits.initialCandidates) limitations.push(`candidate discovery was capped at ${limits.initialCandidates}`);

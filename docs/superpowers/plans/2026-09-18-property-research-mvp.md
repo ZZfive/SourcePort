@@ -51,11 +51,21 @@ ordering and reporting rather than hard eligibility.
 
 ## Next source phases
 
-1. Add official tax, transaction, planning, and ownership evidence adapters
-   with doctor probes and recovery actions.
-2. Add route evidence for both commute anchors and preserve retrieval time and
-   route assumptions.
-3. Add property snapshots and feedback clusters only after exact community and
+The source matrix should grow by evidence role, with each adapter retaining its
+own provenance and recovery path:
+
+1. Listing discovery: public listing portals produce `lead-only` candidates.
+   `property-discover` now accepts explicit source queries and writes normalized
+   candidates plus source evidence.
+2. Official housing policy and presale: the current official-page adapter
+   covers page retrieval; add exact-project permit and filing probes next.
+3. Tax and transaction: add official tax/transaction evidence only after the
+   candidate is bound to a community, building, unit, and room.
+4. Ownership and planning: add title, encumbrance, restriction, delivery, and
+   planning evidence as separate operations; never merge them into a listing.
+5. Route evidence: add a route adapter that preserves travel mode, departure
+   window, route assumptions, retrieval time, and fallback/manual recovery.
+6. Add property snapshots and feedback clusters only after exact community and
    building identity can be resolved.
 
 The current CLI accepts normalized candidate fixtures so these source phases

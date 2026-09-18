@@ -459,6 +459,16 @@ sourceport research-property \
   --report-file property-report.json
 ~~~
 
+Acquire listing leads into a normalized candidate file with explicit source
+queries:
+
+~~~bash
+sourceport property-discover \
+  --input-file private/property-brief.json \
+  --discovery-file private/property-discovery.json \
+  --output-file private/property-candidates.json
+~~~
+
 Inline JSON is also supported:
 
 ~~~bash

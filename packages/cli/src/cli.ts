@@ -17,8 +17,10 @@ import {
   type SourceExecutor,
 } from "@sourceport/car-research";
 import {
+  discoverPropertyCandidates,
   renderPropertyResearchMarkdown,
   researchProperties,
+  validatePropertyDiscoveryRequests,
   validatePropertyResearchBrief,
   type PropertyCandidateInput,
   type PropertyResearchReport,
@@ -388,7 +390,13 @@ export async function runCli(
       if (candidatesFile) {
         try {
           const raw = await readJsonFile(candidatesFile);
-          const rows = Array.isArray(raw) ? raw : raw !== null && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>)["items"]) ? (raw as { items: unknown[] }).items : [];
+          const rows = Array.isArray(raw)
+            ? raw
+            : raw !== null && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>)["candidates"])
+              ? (raw as { candidates: unknown[] }).candidates
+              : raw !== null && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>)["items"])
+                ? (raw as { items: unknown[] }).items
+                : [];
           candidates = rows as PropertyCandidateInput[];
         } catch (error) {
           writeJson(stderr, cliError("invalid_cli_input", `cannot read --candidates-file: ${error instanceof Error ? error.message : "unknown error"}`));
@@ -400,6 +408,56 @@ export async function runCli(
       if (parsed.values.format === "md") stdout(renderPropertyResearchMarkdown(report));
       else writeJson(stdout, report);
       return propertyResearchExitCode(report);
+    }
+
+    if (command === "property-discover") {
+      const parsed = parseArgs({
+        args: [...argv.slice(1)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          input: { type: "string" },
+          "input-file": { type: "string" },
+          "discovery-file": { type: "string" },
+          "output-file": { type: "string" },
+        },
+      });
+      const inlineInput = parsed.values.input;
+      const inputFile = parsed.values["input-file"];
+      const discoveryFile = parsed.values["discovery-file"];
+      if ((inlineInput === undefined) === (inputFile === undefined) || !discoveryFile) {
+        writeJson(stderr, cliError("invalid_cli_input", "property-discover requires exactly one of --input or --input-file, plus --discovery-file"));
+        return 2;
+      }
+      let brief: unknown;
+      let discoveryInput: unknown;
+      try {
+        brief = JSON.parse(inlineInput ?? await readFile(inputFile!, "utf8")) as unknown;
+        discoveryInput = await readJsonFile(discoveryFile);
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", `property discovery input must be valid JSON: ${error instanceof Error ? error.message : "unknown error"}`));
+        return 2;
+      }
+      const briefValidation = validatePropertyResearchBrief(brief);
+      const requestValidation = validatePropertyDiscoveryRequests(discoveryInput);
+      if (!briefValidation.ok || !requestValidation.ok) {
+        writeJson(stderr, {
+          ...cliError("invalid_cli_input", "invalid property discovery input"),
+          ...(briefValidation.ok ? {} : { briefIssues: briefValidation.issues }),
+          ...(requestValidation.ok ? {} : { discoveryIssues: requestValidation.issues }),
+        });
+        return 2;
+      }
+      const executor = dependencies.researchExecutor ?? createRegistrySourceExecutor({
+        registry,
+        cache: dependencies.cache ?? new FileCache(),
+        now,
+      });
+      const discovered = await discoverPropertyCandidates(requestValidation.value, { execute: executor, now });
+      const output = { generatedAt: now().toISOString(), brief: briefValidation.value, ...discovered };
+      await saveJsonFile(parsed.values["output-file"], output);
+      writeJson(stdout, output);
+      return discovered.status === "success" ? 0 : 1;
     }
 
     if (command === "car-context" && argv[1] === "collect") {
@@ -678,7 +736,7 @@ export async function runCli(
       stderr,
       cliError(
         "invalid_cli_input",
-        "expected sources, capabilities, run, doctor, research-cars, research-property, car-context collect, or context collect|compile command",
+        "expected sources, capabilities, run, doctor, research-cars, research-property, property-discover, car-context collect, or context collect|compile command",
       ),
     );
     return 2;
