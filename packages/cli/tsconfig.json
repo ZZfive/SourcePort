@@ -39,6 +39,15 @@
     },
     {
       "path": "../../sources/12365auto"
+    },
+    {
+      "path": "../property-research"
+    },
+    {
+      "path": "../../sources/wuhan-housing"
+    },
+    {
+      "path": "../../sources/wuhan-listings"
     }
   ],
   "include": [

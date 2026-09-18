@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   resolve: {
     alias: {
+      "@sourceport/property-research": fileURLToPath(new URL("./packages/property-research/src/index.ts", import.meta.url)),
+      "@sourceport/wuhan-housing": fileURLToPath(new URL("./sources/wuhan-housing/src/index.ts", import.meta.url)),
+      "@sourceport/wuhan-listings": fileURLToPath(new URL("./sources/wuhan-listings/src/index.ts", import.meta.url)),
       "@sourceport/core": fileURLToPath(
         new URL("./packages/core/src/index.ts", import.meta.url),
       ),

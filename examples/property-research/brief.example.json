@@ -1,0 +1,11 @@
+{
+  "query": "示例城市总包示例预算，新房和二手房，优先三室一厅",
+  "market": { "city": "示例城市" },
+  "housingTypes": ["new", "resale"],
+  "budget": { "maximumAllInCny": 2000000, "basis": "all-in" },
+  "layout": { "bedrooms": 3, "livingRooms": 1 },
+  "commuteAnchors": [
+    { "id": "destination-a", "label": "通勤目的地 A", "priority": "primary" },
+    { "id": "destination-b", "label": "通勤目的地 B", "priority": "primary" }
+  ]
+}

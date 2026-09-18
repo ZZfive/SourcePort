@@ -40,11 +40,11 @@ describe("nested exact-trim assistance evidence", () => {
 
 const commitment: DeliveryEvidence = {
   id: "delivery-1", source: "dealer written quote", sourceUrl: "https://example.org/quote/1", retrievedAt: "2026-09-10T00:00:00Z", validUntil: "2026-09-20T00:00:00Z",
-  market: "武汉", seriesId: "1", trimId: "11", kind: "commitment", earliestDate: "2027-02-01", latestDate: "2027-02-05",
+  market: "示例城市", seriesId: "1", trimId: "11", kind: "commitment", earliestDate: "2027-02-01", latestDate: "2027-02-05",
 };
 const deadline: CarCriterion = { key: "purchase.deliveryBefore", label: "delivery", kind: "hard", priority: 100, requirement: { date: "2027-02-05" } };
 function delivery(items: DeliveryEvidence[]) {
-  return evaluateCriteria([deadline], { ...context, delivery: { evidence: items, market: "武汉", seriesId: "1", trimId: "11", now: "2026-09-12T00:00:00Z" } })[0]!;
+  return evaluateCriteria([deadline], { ...context, delivery: { evidence: items, market: "示例城市", seriesId: "1", trimId: "11", now: "2026-09-12T00:00:00Z" } })[0]!;
 }
 describe("documented delivery windows", () => {
   it("accepts an applicable current commitment on the inclusive deadline", () => {

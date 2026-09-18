@@ -60,7 +60,7 @@ function report(): CarResearchReport {
   return {
     status: "partial",
     query: "bounded candidates",
-    market: { country: "CN", city: "武汉", currency: "CNY" },
+    market: { country: "CN", city: "示例城市", currency: "CNY" },
     generatedAt,
     coverage: {
       mode: "bounded",

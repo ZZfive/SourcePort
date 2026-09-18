@@ -42,7 +42,7 @@ function report(): CarResearchReport {
   return {
     status: "partial",
     query: "two candidates",
-    market: { city: "武汉" },
+    market: { city: "示例城市" },
     generatedAt: now,
     coverage: {
       mode: "bounded",

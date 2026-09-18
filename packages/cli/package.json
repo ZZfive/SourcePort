@@ -12,13 +12,16 @@
     "@sourceport/autohome": "*",
     "@sourceport/brave-search": "*",
     "@sourceport/car-research": "*",
+    "@sourceport/property-research": "*",
     "@sourceport/core": "*",
     "@sourceport/decision-context": "*",
     "@sourceport/dongchedi": "*",
     "@sourceport/kr36": "*",
     "@sourceport/samr": "*",
     "@sourceport/xiaohongshu": "*",
-    "@sourceport/12365auto": "*"
+    "@sourceport/12365auto": "*",
+    "@sourceport/wuhan-housing": "*",
+    "@sourceport/wuhan-listings": "*"
   },
   "devDependencies": {
     "@sourceport/testing": "*"

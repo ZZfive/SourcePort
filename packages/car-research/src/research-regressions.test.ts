@@ -9,7 +9,7 @@ const series = ["A", "B", "银河TT", "新品"];
 const trim = (id: string, high: boolean) => ({ trimId: `${id}-${high ? "high" : "low"}`, name: high ? "舒享版" : "标准版", year: "2026",
   officialPrice: high ? "12万" : "10万", dealerPrice: "", ownerPrice: "", sourceUrl: `https://example.org/${id}/${high}`, configurationUrl: `https://example.org/config/${id}/${high}` });
 const brief = (limits = {}) => ({
-  query: "compare", market: { city: "武汉" },
+  query: "compare", market: { city: "示例城市" },
   criteria: [{ key: "drivingAssistance.capabilities", label: "ACC", kind: "hard", priority: 100, requirement: ["自适应巡航"] }],
   seeds: [{ kind: "series", name: "A", brand: "品牌" }, { kind: "series", name: "B", brand: "品牌" }],
   limits: { initialSeeds: 2, expandedSeries: 2, scannedSeries: 2, exactConfigurations: 4, finalCandidates: 1, ownerReviewsPerSeries: 1, ...limits },

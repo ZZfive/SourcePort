@@ -21,20 +21,20 @@ function success(request: SourceRequest, data: unknown): SourceResult {
   const discriminator = parameters["seriesId"] ?? parameters["trimId"] ??
     parameters["keyword"] ?? parameters["brand"] ?? "all";
   return {
-    requestId: request.requestId ?? "wuhan-fixture",
+    requestId: request.requestId ?? "synthetic-market-fixture",
     source: request.source,
     operation: request.operation,
     operationSchemaVersion: "1.0.0",
     status: "success",
     data,
-    backend: "wuhan-fixture",
+    backend: "synthetic-market-fixture",
     retrievedAt,
     freshness: { isLive: true, ageMs: 0 },
     evidence: [{
-      id: `wuhan-${request.source}-${request.operation}-${String(discriminator)}`,
+      id: `synthetic-market-${request.source}-${request.operation}-${String(discriminator)}`,
       source: request.source,
       operation: request.operation,
-      backend: "wuhan-fixture",
+      backend: "synthetic-market-fixture",
       retrievedAt,
       sourceUrl: `https://fixture.invalid/${request.source}/${request.operation}/${String(discriminator)}`,
       fragment: data,
@@ -195,47 +195,47 @@ async function execute(request: SourceRequest): Promise<SourceResult> {
 
 const costEvidence: CostEvidence[] = [
   {
-    id: "wuhan-tax-unknown-powertrain",
+    id: "synthetic-market-tax-unknown-powertrain",
     component: "purchase-tax",
     minimumCny: 0,
     maximumCny: 10000,
     mandatory: true,
     source: "fixture policy range",
     retrievedAt,
-    market: "武汉",
+    market: "示例城市",
     applicability: "powertrain-specific applicability still requires verification",
   },
   {
-    id: "wuhan-insurance-range",
+    id: "synthetic-market-insurance-range",
     component: "insurance",
     minimumCny: 5000,
     maximumCny: 7000,
     mandatory: true,
     source: "fixture insurance range",
     retrievedAt,
-    market: "武汉",
+    market: "示例城市",
     applicability: "bounded fixture estimate",
   },
   {
-    id: "wuhan-registration",
+    id: "synthetic-market-registration",
     component: "registration",
     minimumCny: 500,
     maximumCny: 500,
     mandatory: true,
     source: "fixture registration fee",
     retrievedAt,
-    market: "武汉",
+    market: "示例城市",
     applicability: "bounded fixture estimate",
   },
 ];
 
-describe("Wuhan bounded car-research fixture E2E", () => {
-  it("validates five seeds, resolves exact trims, and keeps unverified Wuhan prices unknown", async () => {
+describe("local-market bounded car-research fixture E2E", () => {
+  it("validates five seeds, resolves exact trims, and keeps unverified local-market prices unknown", async () => {
     const report = await researchCars({
-      query: "武汉购车，落地不超过15万，没有私桩，辅助驾驶优先，SUV优先但轿车可接受",
-      market: { country: "CN", city: "武汉", currency: "CNY" },
+      query: "示例城市购车，落地不超过示例预算，没有私桩，辅助驾驶优先，SUV优先但轿车可接受",
+      market: { country: "CN", city: "示例城市", currency: "CNY" },
       criteria: [
-        { key: "budget.onRoad.maxCny", label: "15万落地", kind: "hard", priority: 100, requirement: { maxCny: 150000 } },
+        { key: "budget.onRoad.maxCny", label: "示例预算落地", kind: "hard", priority: 100, requirement: { maxCny: 240000 } },
         { key: "drivingAssistance.capabilities", label: "辅助驾驶能力", kind: "preference", priority: 90, requirement: ["自适应巡航", "车道居中"] },
         { key: "bodyStyle.preferred", label: "SUV优先", kind: "preference", priority: 80, requirement: ["SUV"] },
         { key: "ownership.privateCharger", label: "没有私人充电桩", kind: "context", priority: 70, requirement: false },

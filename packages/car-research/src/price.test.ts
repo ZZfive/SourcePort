@@ -12,7 +12,7 @@ describe("car research prices", () => {
 
   it("keeps the total unknown when mandatory applicable evidence is missing", () => {
     const result = calculateOnRoadCost({
-      market: "武汉",
+      market: "示例城市",
       seriesId: "1",
       trimId: "11",
       vehicleReferencePrice: { minimumCny: 120000, maximumCny: 125000 },
@@ -44,12 +44,12 @@ describe("car research prices", () => {
       mandatory: true,
       source: "fixture",
       retrievedAt: "2026-07-25T00:00:00.000Z",
-      market: "武汉",
+      market: "示例城市",
       applicability: "fixture",
     }));
 
     const result = calculateOnRoadCost({
-      market: "武汉",
+      market: "示例城市",
       seriesId: "1",
       trimId: "11",
       vehicleEvidenceIds: [],
@@ -66,9 +66,9 @@ describe("car research prices", () => {
 describe("cost evidence reconciliation", () => {
   const costs = (["vehicle-price", "purchase-tax", "insurance", "registration"] as const).map((component) => ({
     id: component, component, minimumCny: 100, maximumCny: 100, mandatory: true,
-    source: "fixture", retrievedAt: "2026-09-10T00:00:00Z", market: "武汉", applicability: "fixture",
+    source: "fixture", retrievedAt: "2026-09-10T00:00:00Z", market: "示例城市", applicability: "fixture",
   }));
-  const input = { market: "武汉", seriesId: "1", trimId: "11", vehicleEvidenceIds: [] };
+  const input = { market: "示例城市", seriesId: "1", trimId: "11", vehicleEvidenceIds: [] };
   it("does not treat an optional cost as satisfying a required component", () => {
     const costEvidence = costs.map((cost) => ({ ...cost, mandatory: cost.component !== "insurance" }));
     expect(calculateOnRoadCost({ ...input, costEvidence })).toMatchObject({ status: "unknown", missingComponents: ["insurance"] });

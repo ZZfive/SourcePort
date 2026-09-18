@@ -16,13 +16,13 @@ Delivered:
   evaluation, and deterministic ordering;
 - `sourceport research-cars` JSON and Markdown output;
 - the thin repository-owned `skills/research-cars` Skill;
-- fixture end-to-end coverage and a bounded Wuhan live acceptance.
+- fixture end-to-end coverage and a bounded local-market live acceptance.
 
 ## Objective
 
 Complete SourcePort's first bounded consumer proof for the query:
 
-> Buy a car in Wuhan with an on-road budget no higher than CNY 150,000, no
+> Buy a car in local-market with an on-road budget no higher than the supplied budget, no
 > private charger, driving-assistance capability preferred, SUV preferred but
 > sedans acceptable.
 
@@ -54,7 +54,7 @@ an autonomous purchase recommendation.
 3. Add open-ended research contracts and a bounded research engine.
 4. Add JSON and Markdown CLI output.
 5. Add and validate the repository-owned Codex skill.
-6. Run fixture end-to-end tests and a bounded Wuhan live acceptance.
+6. Run fixture end-to-end tests and a bounded local-market live acceptance.
 7. Reconcile README and verification evidence before merge.
 
 ## Bounded Execution Limits
@@ -103,7 +103,7 @@ node packages/cli/dist/main.js doctor autohome --json
 node packages/cli/dist/main.js doctor dongchedi --json
 ```
 
-The bounded Wuhan acceptance must validate or reject at least five seeds,
+The bounded local-market acceptance must validate or reject at least five seeds,
 resolve at least three series to exact trims, retrieve at least three exact
 configurations, and cross-check at least two candidates with Autohome or mark
 them explicitly unmatched. Authentication or captcha stops the affected live
@@ -128,9 +128,9 @@ Live source health:
   page for SSR fetches, each completing in about 1.2 seconds in the final
   doctor run.
 
-Bounded Wuhan live acceptance query:
+Bounded local-market live acceptance query:
 
-> Wuhan purchase, on-road price no higher than CNY 150,000, no private charger,
+> local-market purchase, on-road price no higher than the supplied budget, no private charger,
 > driving assistance preferred, SUV preferred but sedan acceptable.
 
 The input seeds were `星越L`, `博越L`, `星瑞`, `风云T9`, and `长安启源Q05`.
@@ -154,7 +154,7 @@ while Autohome placed it under `奇瑞风云`. The engine did not add an implici
 brand alias or force the merge.
 
 Every candidate had a budget status and assistance status. Budget was
-`unknown` for all candidates because Wuhan transaction price, purchase tax,
+`unknown` for all candidates because local-market transaction price, purchase tax,
 insurance, and registration evidence was missing. Exact-trim assistance checks
 passed for `星越L` and `星瑞`, failed the requested lane-centering preference
 for the inspected `博越L` trim, and remained unknown where the three-trim
@@ -163,13 +163,13 @@ context criterion and did not exclude any powertrain.
 
 Coverage remained bounded to the declared seeds, expansion and scan limits,
 Dongchedi and Autohome, and three exact configuration fetches. This verification
-does not establish full-market coverage or a current Wuhan dealer quotation.
+does not establish full-market coverage or a current local-market dealer quotation.
 
 ## Installed Skill Forward Verification
 
 After `main` was pushed, the Skill was installed from the published GitHub path
 and compared byte-for-byte with `skills/research-cars`. A fresh Codex task then
-used `$research-cars` for the same Wuhan decision boundary without receiving the
+used `$research-cars` for the same local-market decision boundary without receiving the
 expected candidates or report contents.
 
 The task independently:
@@ -182,7 +182,7 @@ The task independently:
 - generated eight seed hypotheses and executed a live bounded report;
 - returned five `needs-verification` candidates, zero eligible candidates, and
   zero evidence-backed hard-condition rejections;
-- preserved all Wuhan on-road budget decisions as `unknown`;
+- preserved all local-market on-road budget decisions as `unknown`;
 - reported exact-trim assistance evidence only when configuration retrieval
   succeeded;
 - stated the bounded coverage and did not describe the result as a market-wide

@@ -21,7 +21,7 @@ SourcePort 是信息获取基础设施，负责：
 - 提供 fixture、契约测试、受限实时探测和恢复动作。
 
 SourcePort core 不负责领域决策。跨来源筛选、排序、推荐和决策属于消费者包或
-Skill。买车研究是第一个验证消费者；可复用的 `decision-context` 消费者负责
+Skill。买车研究是第一个验证消费者；当前也提供买房的确定性研究骨架。可复用的 `decision-context` 消费者负责
 有界车主体验、事件、召回、整改和供应链证据，但不会把这些概念泄漏进 core。
 
 ## 架构
@@ -72,6 +72,8 @@ research-cars Codex Skill
 | <code>@sourceport/core</code> | 合同、证据、注册表、路由、缓存、失败分类和 doctor |
 | <code>@sourceport/cli</code> | 来源发现、operation 执行、doctor 和买车研究 CLI |
 | <code>@sourceport/car-research</code> | 有界跨来源买车研究和确定性报告 |
+| <code>@sourceport/property-research</code> | 按输入城市开展新房和二手房的有界研究、总包成本、双通勤和核验缺口 |
+| <code>@sourceport/wuhan-housing</code> | 武汉住更局、公积金和政府门户的官方住房页面获取与诊断 |
 | <code>@sourceport/decision-context</code> | 跨领域证据语料、来源准入、assessment 校验和提示旗标 |
 | <code>@sourceport/dongchedi</code> | 懂车帝搜索、车系、评价、款型和配置获取 |
 | <code>@sourceport/autohome</code> | 汽车之家品牌目录、评分、可靠性和竞品获取 |
@@ -81,6 +83,7 @@ research-cars Codex Skill
 | <code>@sourceport/xiaohongshu</code> | 有界笔记和顶层评论获取 |
 | <code>@sourceport/testing</code> | 测试 fixture 和辅助工具 |
 | <code>skills/research-cars</code> | 将自然语言买车需求编排到 SourcePort 的薄层 Codex Skill |
+| <code>skills/research-property</code> | 将自然语言买房需求编排到房产研究包的薄层 Codex Skill |
 
 ## 当前 MVP 状态
 
@@ -128,6 +131,8 @@ discovery 线索时必须保持 `unverified`，不能派生 `pause`。
 | 小红书 | <code>search-notes</code> | 搜索有界社区样本 | 当前会话不可用，需要恢复 |
 | 小红书 | <code>get-note</code> | 获取一篇笔记 | 需要有效签名 URL 和会话 |
 | 小红书 | <code>get-comments</code> | 获取受限顶层评论 | 需要有效签名 URL 和会话 |
+| 武汉官方住房来源 | <code>get-official-page</code> | 获取住更局、公积金和政府门户官方住房页面 | 公共 HTTP healthy；浏览器 fallback 已显式诊断 |
+| 武汉房源线索 | <code>search-listings</code> / <code>get-listing</code> | 获取武汉新房和二手房挂牌线索 | <code>search-listings</code> 公共 HTTP healthy；<code>get-listing</code> 当前漂移；结果仅为 lead-only |
 
 精确款型辅助驾驶输出会分别保留：
 
@@ -338,9 +343,7 @@ sourceport run autohome get-series-score \
 ~~~text
 使用 $research-cars。
 
-我在武汉买第一辆车，落地价不能超过15万元，没有私人充电桩。
-辅助驾驶比较重要，重点看ACC、车道居中、自动泊车和高速领航。
-SUV优先，但轿车也可以。请给出不超过5个候选，并列出所有仍需核实的问题。
+请按我提供的城市、预算和偏好研究候选车辆。缺少城市、预算口径、补能条件或功能要求时先询问。
 ~~~
 
 Skill 会先执行一次纸面数据研究并保存完整 JSON sidecar，再只针对最终候选收集
@@ -367,19 +370,19 @@ Skill 会先执行一次纸面数据研究并保存完整 JSON sidecar，再只�
 
 ~~~json
 {
-  "query": "武汉购车，落地价不超过15万元，没有私人充电桩，辅助驾驶优先，SUV优先但轿车也可以",
+  "query": "示例购车需求（请按实际输入填写）",
   "market": {
     "country": "CN",
-    "city": "武汉",
+    "city": "示例城市",
     "currency": "CNY"
   },
   "criteria": [
     {
       "key": "budget.onRoad.maxCny",
-      "label": "武汉落地价不超过15万元",
+      "label": "示例落地预算",
       "kind": "hard",
       "priority": 100,
-      "requirement": { "maxCny": 150000 }
+      "requirement": { "maxCny": 240000 }
     },
     {
       "key": "drivingAssistance.capabilities",
@@ -426,6 +429,19 @@ Skill 会先执行一次纸面数据研究并保存完整 JSON sidecar，再只�
 ~~~bash
 sourceport research-cars --input-file brief.json --format md \
   --report-file car-report.json
+~~~
+
+### 买房研究
+
+`@sourceport/property-research` 从输入读取城市、总包预算、户型、通勤目的地和融资假设。
+这些参数没有个人默认值。仓库中的样例均为虚构数据；实际使用请保存为本地私有输入文件。
+
+~~~bash
+sourceport research-property \
+  --input-file examples/property-research/brief.example.json \
+  --candidates-file examples/property-research/normalized-candidates.json \
+  --format md \
+  --report-file property-report.json
 ~~~
 
 ### 决策背景工作流
@@ -588,26 +604,9 @@ context 命令沿用同一退出码。退出码 `2` 也表示 corpus/assessment 
 退出码 `3` 表示所有必需自动背景获取路径都被人工步骤阻断。可选来源失败只产生
 partial corpus。
 
-## 已验证的武汉验收
+## 验收覆盖
 
-2026-07-25 的武汉有界验收使用了以下决策边界：
-
-> 落地价不高于15万元，没有私人充电桩，辅助驾驶优先，SUV优先但轿车也可以。
-
-验收结果：
-
-| 指标 | 结果 |
-|---|---:|
-| 请求种子验证 | 5/5 |
-| 扩展车系 | 8 |
-| 扫描车系 | 5 |
-| 获取精确配置 | 3 |
-| 最终候选 | 5 |
-| 汽车之家精确匹配 | 4 |
-
-所有武汉落地预算都正确保持为 <code>unknown</code>，因为没有提供适用的成交价、
-购置税、保险和上牌证据。该结果证明了有界且可审计的研究流程，而不是武汉经销商
-报价或全市场搜索。
+合成夹具验证有界发现、精确款型匹配和费用证据缺失处理。个人实测输入及报告不纳入版本控制。
 
 ## 产品边界
 
@@ -626,7 +625,7 @@ SourcePort 当前可以直接用于：
 它不是：
 
 - 全市场车型数据库或穷举目录；
-- 武汉实时经销商报价、库存或交付周期系统；
+- 当地实时经销商报价、库存或交付周期系统；
 - 对某辆车必然可以在指定预算内落地的保证；
 - 自动替用户做最终交易决策的引擎；
 - 任意 URL 公共网页读取器或通用爬虫；
@@ -686,3 +685,5 @@ sourceport doctor xiaohongshu --json
 - [决策背景汽车 MVP 实施状态](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)
 - [research-cars Skill](skills/research-cars/SKILL.md)
 - [English README](README.md)
+
+个人输入请保存在 `private/` 或 `*.local.json`，结果保存在 `reports/`；这些路径已被 Git 忽略。数字样例仅用于演示，不是默认预算。公开适配器名称和官方网址表示数据源覆盖范围，不表示用户居住地。

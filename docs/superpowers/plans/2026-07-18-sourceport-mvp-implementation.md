@@ -756,7 +756,7 @@ Codex environment.
 - `skills/car-research/SKILL.md`
 - `skills/car-research/references/sourceport-operations.md`
 - `skills/car-research/references/driving-assistance-capabilities.md`
-- `skills/car-research/examples/wuhan-15w-query.json`
+- `skills/car-research/examples/car-brief.example.json`
 - `skills/car-research/examples/candidate-result.json`
 
 ### Required behavior

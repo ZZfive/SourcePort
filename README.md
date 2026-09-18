@@ -25,7 +25,8 @@ SourcePort is an information-access layer. It owns:
 
 SourcePort does not make domain decisions in its core. Cross-source filtering,
 ranking, recommendation, and decision-making belong to consumer packages or
-skills. Car research is the first validation consumer. The reusable
+skills. Car research is the first validation consumer, and the repository now
+also contains a deterministic property-research skeleton. The reusable
 `decision-context` consumer adds bounded owner, event, recall, remediation, and
 supply-chain evidence without leaking those concepts into core.
 
@@ -77,6 +78,8 @@ The repository currently contains:
 | <code>@sourceport/core</code> | Contracts, evidence, registry, routing, cache, failures, and doctor |
 | <code>@sourceport/cli</code> | Source discovery, operation execution, doctor, and car-research CLI |
 | <code>@sourceport/car-research</code> | Bounded cross-source car research and deterministic reporting |
+| <code>@sourceport/property-research</code> | Bounded configurable new/resale property research, all-in costs, dual commutes, and verification gaps |
+| <code>@sourceport/wuhan-housing</code> | Official Wuhan housing, presale, government, and provident-fund page acquisition and diagnosis |
 | <code>@sourceport/decision-context</code> | Cross-domain evidence corpus, source admission, assessment validation, and advisory flags |
 | <code>@sourceport/dongchedi</code> | Dongchedi search, series, review, trim, and configuration acquisition |
 | <code>@sourceport/autohome</code> | Autohome brand catalog, score, reliability, and competitor acquisition |
@@ -86,6 +89,7 @@ The repository currently contains:
 | <code>@sourceport/xiaohongshu</code> | Bounded note and top-level comment acquisition |
 | <code>@sourceport/testing</code> | Test fixtures and helpers |
 | <code>skills/research-cars</code> | Thin Codex orchestration skill for natural-language car research |
+| <code>skills/research-property</code> | Thin Codex orchestration skill for natural-language property research |
 
 ## Current MVP status
 
@@ -141,6 +145,8 @@ remain `unverified` and cannot do so.
 | Xiaohongshu | <code>search-notes</code> | Search a bounded community sample | Current session unavailable; recovery required |
 | Xiaohongshu | <code>get-note</code> | Retrieve one note | Requires a valid signed note URL/session |
 | Xiaohongshu | <code>get-comments</code> | Retrieve bounded top-level comments | Requires a valid signed note URL/session |
+| Wuhan official housing | <code>get-official-page</code> | Retrieve allowlisted housing, presale, government, and provident-fund pages | Public HTTP healthy; browser fallback diagnosed explicitly |
+| Wuhan listing leads | <code>search-listings</code> / <code>get-listing</code> | Retrieve Wuhan new and resale listing leads | <code>search-listings</code> public HTTP healthy; <code>get-listing</code> currently drifted; results are lead-only |
 
 Exact-trim driving-assistance output keeps claimed automation level, concrete
 capabilities, operating domains, perception hardware, system/version,
@@ -342,11 +348,8 @@ Codex explicitly:
 ~~~text
 Use $research-cars.
 
-I am buying a first car in Wuhan. The on-road price must not exceed CNY
-150,000. I do not have a private charger. Driving assistance is important,
-especially ACC, lane centering, automatic parking, and highway navigation.
-Prefer an SUV, but a sedan is acceptable. Return no more than five candidates
-and list everything that still needs verification.
+Research cars for my selected city and on-road budget. Ask for missing
+preferences, charging access, and required capabilities.
 ~~~
 
 The Skill runs the paper-data research once with a complete JSON sidecar, then
@@ -380,19 +383,19 @@ Create <code>brief.json</code>:
 
 ~~~json
 {
-  "query": "武汉购车，落地价不超过15万元，没有私人充电桩，辅助驾驶优先，SUV优先但轿车也可以",
+  "query": "示例购车需求（请按实际输入填写）",
   "market": {
     "country": "CN",
-    "city": "武汉",
+    "city": "示例城市",
     "currency": "CNY"
   },
   "criteria": [
     {
       "key": "budget.onRoad.maxCny",
-      "label": "武汉落地价不超过15万元",
+      "label": "示例落地预算",
       "kind": "hard",
       "priority": 100,
-      "requirement": { "maxCny": 150000 }
+      "requirement": { "maxCny": 240000 }
     },
     {
       "key": "drivingAssistance.capabilities",
@@ -439,6 +442,21 @@ Run one live paper-data research and keep its complete sidecar:
 ~~~bash
 sourceport research-cars --input-file brief.json --format md \
   --report-file car-report.json
+~~~
+
+### Property research
+
+`@sourceport/property-research` reads city, all-in budget, layout preferences,
+commute destinations, and financing assumptions from the supplied brief.
+There is no default personal profile. The checked-in example is synthetic;
+replace it with a private input file before doing real research.
+
+~~~bash
+sourceport research-property \
+  --input-file examples/property-research/brief.example.json \
+  --candidates-file examples/property-research/normalized-candidates.json \
+  --format md \
+  --report-file property-report.json
 ~~~
 
 Inline JSON is also supported:
@@ -613,21 +631,10 @@ corpus/assessment references. Exit `3` means all required automatic context
 paths are blocked by a human step; optional-source failures produce a partial
 corpus instead.
 
-## Verified Wuhan acceptance
+## Acceptance coverage
 
-The bounded Wuhan acceptance on 2026-07-25 used the decision boundary:
-
-> On-road price no higher than CNY 150,000, no private charger, driving
-> assistance preferred, SUV preferred but sedan acceptable.
-
-It validated all five requested seeds, expanded to eight series, scanned five
-series, retrieved three exact configurations, returned five candidates, and
-matched four candidates exactly with Autohome.
-
-All Wuhan on-road budget decisions correctly remained <code>unknown</code>
-because applicable transaction, tax, insurance, and registration evidence was
-not supplied. The result demonstrated auditable bounded research, not a Wuhan
-dealer quotation or a full-market search.
+Synthetic fixtures exercise bounded discovery, exact-trim matching, and unknown
+cost evidence. Private live-run briefs and reports are excluded from version control.
 
 ## Product boundary
 
@@ -647,7 +654,7 @@ SourcePort can now be used directly for:
 It is not:
 
 - a full-market vehicle database or exhaustive catalog;
-- a live Wuhan dealer-quotation, inventory, or delivery-time system;
+- a live local dealer-quotation, inventory, or delivery-time system;
 - a guarantee that a vehicle can be purchased within a stated on-road budget;
 - an autonomous purchase decision or transaction engine;
 - an arbitrary-URL public web reader or general crawler;
@@ -692,3 +699,5 @@ private raw pages.
 - [Decision-context car MVP implementation status](docs/superpowers/plans/2026-07-26-decision-context-car-mvp.md)
 - [research-cars Skill](skills/research-cars/SKILL.md)
 - [简体中文 README](README_zh.md)
+
+Private inputs belong in `private/` or `*.local.json`; reports belong in `reports/`. These paths are ignored by Git. Numeric examples are synthetic, not defaults. Public adapter names and official URLs identify supported sources, not a buyer profile.

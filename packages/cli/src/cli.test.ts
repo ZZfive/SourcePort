@@ -35,8 +35,8 @@ function registry() {
 }
 
 const researchBrief = {
-  query: "武汉15万落地买车",
-  market: { city: "武汉" },
+  query: "示例城市示例预算落地买车",
+  market: { city: "示例城市" },
   criteria: [],
   seeds: [{ kind: "series", name: "车型A" }],
 };
@@ -299,6 +299,32 @@ describe("SourcePort CLI", () => {
     expect(JSON.parse(output.stderr.join(""))).toEqual(expect.objectContaining({
       error: expect.objectContaining({ code: "invalid_cli_input" }),
     }));
+  });
+
+  it("runs deterministic configurable property research from a brief and candidate fixture", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sourceport-property-cli-"));
+    const candidatesFile = join(directory, "candidates.json");
+    const reportFile = join(directory, "property-report.json");
+    const brief = {
+      query: "示例城市总包示例预算，新房和二手房，优先三室一厅",
+      market: { city: "示例城市" },
+      housingTypes: ["new", "resale"],
+      budget: { maximumAllInCny: 2_000_000, basis: "all-in" },
+      layout: { bedrooms: 3, livingRooms: 1 },
+      commuteAnchors: [{ id: "destinationA", label: "通勤目的地 A" }, { id: "destinationB", label: "通勤目的地 B" }],
+    };
+    await writeFile(candidatesFile, JSON.stringify([{ candidateId: "fixture-1", kind: "new", city: "示例城市", community: "测试小区", bedrooms: 3, livingRooms: 1, purchasePrice: { minimumCny: 1_400_000, maximumCny: 1_400_000 }, commuteMinutes: { destinationA: 40, destinationB: 50 } }]), "utf8");
+    try {
+      const output = capture();
+      const exitCode = await runCli(["research-property", "--input", JSON.stringify(brief), "--candidates-file", candidatesFile, "--format", "md", "--report-file", reportFile], { now: () => new Date("2026-09-18T00:00:00.000Z"), ...output.io });
+      expect(exitCode).toBe(1);
+      expect(output.stdout.join("")).toContain("# 示例城市买房研究");
+      expect(output.stdout.join("")).toContain("通勤目的地 A=40 分钟");
+      expect(JSON.parse(await readFile(reportFile, "utf8"))).toEqual(expect.objectContaining({ status: "partial" }));
+      expect(output.stderr).toEqual([]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("collects and compiles decision context with JSON sidecars", async () => {

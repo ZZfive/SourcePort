@@ -178,7 +178,7 @@ function costs(): CostEvidence[] {
       mandatory: true,
       source: "fixture policy",
       retrievedAt,
-      market: "武汉",
+      market: "示例城市",
       applicability: "fixture",
     },
     {
@@ -189,7 +189,7 @@ function costs(): CostEvidence[] {
       mandatory: true,
       source: "fixture quote",
       retrievedAt,
-      market: "武汉",
+      market: "示例城市",
       applicability: "fixture",
     },
     {
@@ -200,7 +200,7 @@ function costs(): CostEvidence[] {
       mandatory: true,
       source: "fixture fee",
       retrievedAt,
-      market: "武汉",
+      market: "示例城市",
       applicability: "fixture",
     },
   ];
@@ -214,19 +214,19 @@ function costs(): CostEvidence[] {
       mandatory: true,
       source: "fixture dealer",
       retrievedAt,
-      market: "武汉",
+      market: "示例城市",
       applicability: "exact fixture trim",
       appliesTo: { trimId: "11" },
     },
     {
       id: "vehicle-b",
       component: "vehicle-price",
-      minimumCny: 155000,
-      maximumCny: 160000,
+      minimumCny: 255000,
+      maximumCny: 260000,
       mandatory: true,
       source: "fixture dealer",
       retrievedAt,
-      market: "武汉",
+      market: "示例城市",
       applicability: "exact fixture trim",
       appliesTo: { trimId: "22" },
     },
@@ -236,10 +236,10 @@ function costs(): CostEvidence[] {
 describe("bounded car research engine", () => {
   it("validates seeds, cross-checks sources, evaluates exact trims, and rejects a proven budget failure", async () => {
     const report = await researchCars({
-      query: "武汉15万落地，辅助驾驶优先，SUV优先",
-      market: { country: "CN", city: "武汉", currency: "CNY" },
+      query: "示例城市示例预算落地，辅助驾驶优先，SUV优先",
+      market: { country: "CN", city: "示例城市", currency: "CNY" },
       criteria: [
-        { key: "budget.onRoad.maxCny", label: "15万落地", kind: "hard", priority: 100, requirement: { maxCny: 150000 } },
+        { key: "budget.onRoad.maxCny", label: "示例预算落地", kind: "hard", priority: 100, requirement: { maxCny: 240000 } },
         { key: "drivingAssistance.capabilities", label: "自适应巡航", kind: "preference", priority: 90, requirement: ["自适应巡航"] },
         { key: "bodyStyle.preferred", label: "SUV优先", kind: "preference", priority: 80, requirement: ["SUV"] },
         { key: "ownership.privateCharger", label: "没有私桩", kind: "context", priority: 70, requirement: false },

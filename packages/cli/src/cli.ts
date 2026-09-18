@@ -17,6 +17,13 @@ import {
   type SourceExecutor,
 } from "@sourceport/car-research";
 import {
+  renderPropertyResearchMarkdown,
+  researchProperties,
+  validatePropertyResearchBrief,
+  type PropertyCandidateInput,
+  type PropertyResearchReport,
+} from "@sourceport/property-research";
+import {
   collectDecisionContext,
   compileDecisionContext,
   renderDecisionContextMarkdown,
@@ -43,6 +50,8 @@ import { Auto12365Adapter } from "@sourceport/12365auto";
 import { createFileSnapshotStore, detectMarketEvent, freshness as snapshotFreshness, type VehicleSnapshot } from "@sourceport/market-intelligence";
 import { clusterFeedback, normalize12365Complaints, createFileFeedbackSnapshotStore, diffFeedbackSnapshots, type FeedbackSnapshot } from "@sourceport/market-feedback";
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
+import { WuhanHousingAdapter } from "@sourceport/wuhan-housing";
+import { WuhanListingsAdapter } from "@sourceport/wuhan-listings";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
@@ -74,6 +83,10 @@ function researchExitCode(report: CarResearchReport): number {
   if (report.status === "blocked") {
     return 3;
   }
+  return report.status === "success" ? 0 : 1;
+}
+
+function propertyResearchExitCode(report: PropertyResearchReport): number {
   return report.status === "success" ? 0 : 1;
 }
 
@@ -109,6 +122,8 @@ export function createDefaultRegistry(): SourceRegistry {
   registry.register(new SamrAdapter({ openCliCommand }));
   registry.register(new Auto12365Adapter(openCliCommand));
   registry.register(new XiaohongshuAdapter(openCliCommand));
+  registry.register(new WuhanHousingAdapter({ openCliCommand }));
+  registry.register(new WuhanListingsAdapter({ openCliCommand }));
   return registry;
 }
 
@@ -331,6 +346,60 @@ export async function runCli(
         writeJson(stdout, report);
       }
       return researchExitCode(report);
+    }
+
+    if (command === "research-property") {
+      const parsed = parseArgs({
+        args: [...argv.slice(1)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          input: { type: "string" },
+          "input-file": { type: "string" },
+          "candidates-file": { type: "string" },
+          format: { type: "string", default: "json" },
+          "report-file": { type: "string" },
+        },
+      });
+      const inlineInput = parsed.values.input;
+      const inputFile = parsed.values["input-file"];
+      if ((inlineInput === undefined) === (inputFile === undefined)) {
+        writeJson(stderr, cliError("invalid_cli_input", "research-property requires exactly one of --input or --input-file"));
+        return 2;
+      }
+      if (parsed.values.format !== "json" && parsed.values.format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "--format must be json or md"));
+        return 2;
+      }
+      let brief: unknown;
+      try {
+        brief = JSON.parse(inlineInput ?? await readFile(inputFile!, "utf8")) as unknown;
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", `property input must be valid JSON: ${error instanceof Error ? error.message : "unknown error"}`));
+        return 2;
+      }
+      const briefValidation = validatePropertyResearchBrief(brief);
+      if (!briefValidation.ok) {
+        writeJson(stderr, { ...cliError("invalid_cli_input", "invalid PropertyResearchBrief"), issues: briefValidation.issues });
+        return 2;
+      }
+      let candidates: readonly PropertyCandidateInput[] = [];
+      const candidatesFile = parsed.values["candidates-file"];
+      if (candidatesFile) {
+        try {
+          const raw = await readJsonFile(candidatesFile);
+          const rows = Array.isArray(raw) ? raw : raw !== null && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>)["items"]) ? (raw as { items: unknown[] }).items : [];
+          candidates = rows as PropertyCandidateInput[];
+        } catch (error) {
+          writeJson(stderr, cliError("invalid_cli_input", `cannot read --candidates-file: ${error instanceof Error ? error.message : "unknown error"}`));
+          return 2;
+        }
+      }
+      const report = await researchProperties(briefValidation.value, { candidates, now });
+      await saveJsonFile(parsed.values["report-file"], report);
+      if (parsed.values.format === "md") stdout(renderPropertyResearchMarkdown(report));
+      else writeJson(stdout, report);
+      return propertyResearchExitCode(report);
     }
 
     if (command === "car-context" && argv[1] === "collect") {
@@ -609,7 +678,7 @@ export async function runCli(
       stderr,
       cliError(
         "invalid_cli_input",
-        "expected sources, capabilities, run, doctor, research-cars, car-context collect, or context collect|compile command",
+        "expected sources, capabilities, run, doctor, research-cars, research-property, car-context collect, or context collect|compile command",
       ),
     );
     return 2;

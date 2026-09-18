@@ -101,7 +101,7 @@ export function calculateOnRoadCost(input: {
       component: "vehicle-reference",
       range: input.vehicleReferencePrice,
       source: "dongchedi",
-      applicability: "source reference price; not verified as a Wuhan transaction price",
+      applicability: "source reference price; not verified as a local-market transaction price",
       evidenceIds: input.vehicleEvidenceIds,
     });
   }
@@ -128,7 +128,7 @@ export function calculateOnRoadCost(input: {
     reasons.push(`missing applicable evidence for: ${missingComponents.join(", ")}`);
   }
   if (!present.has("vehicle-price") && input.vehicleReferencePrice) {
-    reasons.push("vehicle price is a source reference, not a verified Wuhan transaction price");
+    reasons.push("vehicle price is a source reference, not a verified local-market transaction price");
   }
   if (duplicateComponents.length) {
     reasons.push(`multiple applicable quotes require reconciliation, not addition: ${duplicateComponents.join(", ")}`);

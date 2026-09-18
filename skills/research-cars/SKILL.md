@@ -97,7 +97,7 @@ report; context flags are advisory and never auto-reject a candidate.
 - Do not recommend a candidate whose hard condition is `unknown`, `conflict`,
   or `unsupported`; label it `needs-verification`.
 - Do not translate absent configuration data into "not supported".
-- Do not turn a source reference price into a Wuhan transaction or on-road
+- Do not turn a source reference price into a local-market transaction or on-road
   price. Treat the budget result as unknown unless all mandatory cost evidence
   is dated and applicable.
 - Do not infer delivery from launch, presale, or on-sale status. Encode the

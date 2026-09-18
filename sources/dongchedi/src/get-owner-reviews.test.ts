@@ -10,7 +10,7 @@ const html = `<script id="__NEXT_DATA__">${JSON.stringify({
         review_list: [
           {
             gid_str: "7399912345678901234",
-            user_info: { name: "武汉车主" },
+            user_info: { name: "示例车主" },
             buy_car_info: { year: 2025, car_name: "xDrive30Li M运动套装" },
             score_info: { score: 438 },
             digg_count_en: 28,
@@ -40,7 +40,7 @@ describe("Dongchedi get-owner-reviews", () => {
         {
           reviewId: "7399912345678901234",
           rank: 1,
-          userDisplayName: "武汉车主",
+          userDisplayName: "示例车主",
           trim: "2025 xDrive30Li M运动套装",
           score: 4.38,
           likes: 28,

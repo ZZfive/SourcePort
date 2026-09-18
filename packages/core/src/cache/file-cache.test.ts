@@ -20,7 +20,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-function key(parameters: unknown = { market: "武汉", value: "x" }): CacheKeyInput {
+function key(parameters: unknown = { market: "示例城市", value: "x" }): CacheKeyInput {
   return {
     source: "fake",
     operation: "echo",
@@ -55,13 +55,13 @@ function liveResult(value = "x"): SourceResult {
 
 describe("cache keys", () => {
   it("normalizes object key order", () => {
-    expect(buildCacheKey(key({ market: "武汉", nested: { b: 2, a: 1 } }))).toBe(
-      buildCacheKey(key({ nested: { a: 1, b: 2 }, market: "武汉" })),
+    expect(buildCacheKey(key({ market: "示例城市", nested: { b: 2, a: 1 } }))).toBe(
+      buildCacheKey(key({ nested: { a: 1, b: 2 }, market: "示例城市" })),
     );
   });
 
   it("separates market parameters and schema versions", () => {
-    expect(buildCacheKey(key({ market: "武汉" }))).not.toBe(buildCacheKey(key({ market: "上海" })));
+    expect(buildCacheKey(key({ market: "示例城市" }))).not.toBe(buildCacheKey(key({ market: "上海" })));
     expect(buildCacheKey(key())).not.toBe(buildCacheKey({ ...key(), operationSchemaVersion: "2.0.0" }));
   });
 

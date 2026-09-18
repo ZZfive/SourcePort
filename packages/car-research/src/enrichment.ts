@@ -11,7 +11,7 @@ export interface ReportEnrichmentInput {
 
 function actionItems(report: CarResearchReport, freshness: string | undefined, feedback: Array<{ signal: string }>): string[] {
   const actions = new Set<string>();
-  if (report.candidates.some((candidate) => candidate.onRoadCost?.status === "unknown")) actions.add("向武汉经销商确认成交价、购置税、保险和上牌费用，并保存报价凭证");
+  if (report.candidates.some((candidate) => candidate.onRoadCost?.status === "unknown")) actions.add(`向${report.market.city}经销商确认成交价、购置税、保险和上牌费用，并保存报价凭证`);
   if (report.candidates.some((candidate) => candidate.eligibility === "needs-verification")) actions.add("逐项核对目标年款和具体款型的硬条件，缺失证据不得直接下单");
   if (report.candidates.some((candidate) => candidate.drivingAssistance === null)) actions.add("试驾前确认辅助驾驶硬件、软件版本、开通条件和地区适用性");
   if (freshness === "stale" || freshness === "aging") actions.add("刷新重点候选的价格、在售状态和辅助驾驶配置");

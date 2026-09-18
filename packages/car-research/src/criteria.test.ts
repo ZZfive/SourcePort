@@ -6,10 +6,10 @@ describe("car criteria", () => {
   it("does not reject a hard criterion whose evidence is unknown", () => {
     const results = evaluateCriteria([{
       key: "budget.onRoad.maxCny",
-      label: "15万落地",
+      label: "示例预算落地",
       kind: "hard",
       priority: 10,
-      requirement: { maxCny: 150000 },
+      requirement: { maxCny: 240000 },
     }], {
       onRoadCost: {
         status: "unknown",

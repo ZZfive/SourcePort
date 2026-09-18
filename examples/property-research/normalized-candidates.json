@@ -1,0 +1,48 @@
+[
+  {
+    "candidateId": "fixture-new-001",
+    "kind": "new",
+    "city": "示例城市",
+    "district": "示例区域",
+    "community": "示例新项目",
+    "building": "1栋",
+    "unit": "1单元",
+    "room": "101",
+    "bedrooms": 3,
+    "livingRooms": 1,
+    "areaSqm": 96.5,
+    "purchasePrice": { "minimumCny": 1480000, "maximumCny": 1480000 },
+    "commuteMinutes": { "destination-a": 40, "destination-b": 55 },
+    "riskEvidence": [
+      {
+        "id": "fixture-presale-001",
+        "category": "presale-permit",
+        "status": "unknown",
+        "summary": "预售许可证待官方来源核验",
+        "source": "fixture",
+        "retrievedAt": "2026-09-18T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "candidateId": "fixture-resale-001",
+    "kind": "resale",
+    "city": "示例城市",
+    "district": "示例区域",
+    "community": "示例二手小区",
+    "bedrooms": 3,
+    "livingRooms": 1,
+    "purchasePrice": { "minimumCny": 1550000, "maximumCny": 1550000 },
+    "commuteMinutes": { "destination-a": 52, "destination-b": 38 },
+    "riskEvidence": [
+      {
+        "id": "fixture-title-001",
+        "category": "ownership",
+        "status": "unknown",
+        "summary": "产权、抵押和查封状态待交易文件核验",
+        "source": "fixture",
+        "retrievedAt": "2026-09-18T00:00:00Z"
+      }
+    ]
+  }
+]

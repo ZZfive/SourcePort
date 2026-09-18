@@ -6,15 +6,15 @@ Use an open criterion list instead of a fixed universal car-query schema:
 
 ```json
 {
-  "query": "武汉15万落地，没有私桩，辅助驾驶优先，SUV优先",
-  "market": { "country": "CN", "city": "武汉", "currency": "CNY" },
+  "query": "示例城市示例预算落地，没有私桩，辅助驾驶优先，SUV优先",
+  "market": { "country": "CN", "city": "示例城市", "currency": "CNY" },
   "criteria": [
     {
       "key": "budget.onRoad.maxCny",
-      "label": "落地价不超过15万元",
+      "label": "落地价不超过示例预算",
       "kind": "hard",
       "priority": 100,
-      "requirement": { "maxCny": 150000 }
+      "requirement": { "maxCny": 240000 }
     },
     {
       "key": "drivingAssistance.capabilities",
@@ -79,7 +79,7 @@ An auditable on-road price needs applicable evidence for:
 Each item needs a stable ID, CNY range, mandatory flag, source, retrieval date,
 market/applicability, and optional exact series/trim scope. A Dongchedi guide,
 dealer, or owner price remains a reference estimate unless verified as an
-applicable Wuhan transaction price.
+applicable local-market transaction price.
 
 Do not invent a zero tax, insurance range, registration cost, subsidy, trade-in
 discount, financing discount, or dealer quote. When one required component is
@@ -130,7 +130,7 @@ alternatives explain acquisition and eligibility status.
 ## Delivery Evidence
 
 `purchaseTiming.targetDate` generates a hard delivery criterion.
-`budget: { "maximumCny": 150000, "basis": "on-road" }` generates a hard
+`budget: { "maximumCny": 240000, "basis": "on-road" }` generates a hard
 on-road ceiling. If either is also specified explicitly, both definitions must
 agree; duplicate criterion keys are rejected.
 

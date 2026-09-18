@@ -18,3 +18,8 @@ test-results/
 *.cookie
 *.cookies
 *.har
+
+# Private research inputs, reports, and local source configuration.
+/reports/
+/private/
+*.local.json

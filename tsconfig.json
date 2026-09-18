@@ -20,6 +20,9 @@
       "path": "./packages/market-feedback"
     },
     {
+      "path": "./packages/property-research"
+    },
+    {
       "path": "./packages/cli"
     },
     {
@@ -42,6 +45,12 @@
     },
     {
       "path": "./sources/12365auto"
+    },
+    {
+      "path": "./sources/wuhan-housing"
+    },
+    {
+      "path": "./sources/wuhan-listings"
     }
   ]
 }

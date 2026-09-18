@@ -6,7 +6,7 @@ describe("CarResearchBrief", () => {
   it("preserves open-ended criteria instead of rejecting unknown keys", () => {
     const input = {
       query: "test",
-      market: { city: "武汉" },
+      market: { city: "示例城市" },
       criteria: [{
         key: "future.unmodeled.filter",
         label: "未来条件",
@@ -26,7 +26,7 @@ describe("CarResearchBrief", () => {
   it("rejects evidence budgets above the bounded maxima", () => {
     const result = validateCarResearchBrief({
       query: "test",
-      market: { city: "武汉" },
+      market: { city: "示例城市" },
       criteria: [],
       seeds: [{ kind: "series", name: "车型A" }],
       limits: { exactConfigurations: MAX_RESEARCH_LIMITS.exactConfigurations + 1 },
@@ -39,7 +39,7 @@ describe("CarResearchBrief", () => {
   });
 });
 
-const brief: CarResearchBrief = { query: "test", market: { city: "武汉" }, criteria: [], seeds: [{ kind: "series", name: "车型A" }] };
+const brief: CarResearchBrief = { query: "test", market: { city: "示例城市" }, criteria: [], seeds: [{ kind: "series", name: "车型A" }] };
 describe("discovery and delivery input contracts", () => {
   it("requires dated, attributable release leads", () => {
     expect(validateCarResearchBrief({ ...brief, discovery: { leads: [{ name: "新品", brand: "品牌" }] } }).ok).toBe(false);
@@ -50,28 +50,28 @@ describe("discovery and delivery input contracts", () => {
     expect(validateCarResearchBrief({ ...brief, purchaseTiming: { targetDate: "2027-02-30" } }).ok).toBe(false);
   });
   it("converts convenience deadline and on-road ceiling to explicit hard criteria", () => {
-    expect(effectiveCriteria({ ...brief, purchaseTiming: { targetDate: "2027-02-05" }, budget: { maximumCny: 150000, basis: "on-road" } }).map((item) => [item.key, item.kind]))
+    expect(effectiveCriteria({ ...brief, purchaseTiming: { targetDate: "2027-02-05" }, budget: { maximumCny: 240000, basis: "on-road" } }).map((item) => [item.key, item.kind]))
       .toEqual([["purchase.deliveryBefore", "hard"], ["budget.onRoad.maxCny", "hard"]]);
   });
 });
 
 
 describe("criterion identity and convenience consistency", () => {
-  const budget = { key: "budget.onRoad.maxCny", label: "budget", kind: "hard", priority: 100, requirement: { maxCny: 150000 } };
+  const budget = { key: "budget.onRoad.maxCny", label: "budget", kind: "hard", priority: 100, requirement: { maxCny: 240000 } };
   it("rejects duplicate keys rather than silently picking one", () => {
     expect(validateCarResearchBrief({ ...brief, criteria: [budget, budget] }).ok).toBe(false);
   });
   it("rejects conflicting or weakened convenience constraints", () => {
     expect(validateCarResearchBrief({ ...brief, criteria: [budget], budget: { maximumCny: 160000, basis: "on-road" } }).ok).toBe(false);
-    expect(validateCarResearchBrief({ ...brief, criteria: [{ ...budget, kind: "preference" }], budget: { maximumCny: 150000, basis: "on-road" } }).ok).toBe(false);
-    expect(validateCarResearchBrief({ ...brief, criteria: [budget], budget: { maximumCny: 150000, basis: "on-road" } }).ok).toBe(true);
+    expect(validateCarResearchBrief({ ...brief, criteria: [{ ...budget, kind: "preference" }], budget: { maximumCny: 240000, basis: "on-road" } }).ok).toBe(false);
+    expect(validateCarResearchBrief({ ...brief, criteria: [budget], budget: { maximumCny: 240000, basis: "on-road" } }).ok).toBe(true);
   });
 });
 
 
 describe("cost input evidence integrity", () => {
   const cost = { id: "quote", component: "vehicle-price", minimumCny: 100000, maximumCny: 100000,
-    mandatory: true, source: "dealer", applicability: "Wuhan", retrievedAt: "2026-09-10T00:00:00Z" };
+    mandatory: true, source: "dealer", applicability: "local-market", retrievedAt: "2026-09-10T00:00:00Z" };
   it.each([{ minimumCny: "100000" }, { maximumCny: null }, { appliesTo: { trimId: 0 } }, { market: "" }])(
     "rejects coercible prices and malformed scope %j", (change) => {
       expect(validateCarResearchBrief({ ...brief, costEvidence: [{ ...cost, ...change }] }).ok).toBe(false);
@@ -79,7 +79,7 @@ describe("cost input evidence integrity", () => {
   it("rejects cost and delivery provenance collisions", () => {
     expect(validateCarResearchBrief({ ...brief, costEvidence: [cost], deliveryEvidence: [{
       id: "quote", source: "dealer", sourceUrl: "https://example.org/quote", retrievedAt: cost.retrievedAt,
-      validUntil: "2026-09-20T00:00:00Z", market: "武汉", trimId: "11", kind: "commitment",
+      validUntil: "2026-09-20T00:00:00Z", market: "示例城市", trimId: "11", kind: "commitment",
       earliestDate: "2026-09-15", latestDate: "2026-09-20",
     }] }).ok).toBe(false);
   });
