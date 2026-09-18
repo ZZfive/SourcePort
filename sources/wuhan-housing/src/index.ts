@@ -29,15 +29,25 @@ const allowedHosts = new Set([
   "zgj.wuhan.gov.cn",
   "gjj.wuhan.gov.cn",
   "www.wuhan.gov.cn",
+  "fgj.wuhan.gov.cn",
   "spfxm.whfgxx.org.cn",
+  "zrzyhgh.wuhan.gov.cn",
+  "zrzyhcxjs.wuhan.gov.cn",
 ]);
 
 export interface WuhanOfficialPage {
   title: string;
   body: string;
   url: string;
-  topic: "presale-permit" | "mortgage" | "policy" | "other";
+  topic: "presale-permit" | "mortgage" | "policy" | "tax" | "transaction" | "ownership" | "planning" | "other";
   publishedAt?: string;
+}
+
+export interface WuhanPropertyDocument extends WuhanOfficialPage {
+  candidateId: string;
+  propertyRef: string;
+  identityMatch: "matched" | "unresolved";
+  evidenceStatus: "source-verified" | "unresolved";
 }
 
 const pageOperation: OperationDescriptor = {
@@ -52,7 +62,7 @@ const pageOperation: OperationDescriptor = {
     required: ["url"],
     properties: {
       url: { type: "string", minLength: 1 },
-      topic: { enum: ["presale-permit", "mortgage", "policy", "other"] },
+      topic: { enum: ["presale-permit", "mortgage", "policy", "tax", "transaction", "ownership", "planning", "other"] },
     },
   },
   outputSchema: {
@@ -63,8 +73,50 @@ const pageOperation: OperationDescriptor = {
       title: { type: "string", minLength: 1 },
       body: { type: "string", minLength: 1 },
       url: { type: "string", minLength: 1 },
-      topic: { enum: ["presale-permit", "mortgage", "policy", "other"] },
+      topic: { enum: ["presale-permit", "mortgage", "policy", "tax", "transaction", "ownership", "planning", "other"] },
       publishedAt: { type: "string" },
+    },
+  },
+  backends: [
+    { name: "wuhan-housing-public", kind: "public-http", priority: 0 },
+    { name: "wuhan-housing-browser", kind: "opencli", priority: 1 },
+    { name: "wuhan-housing-manual", kind: "manual-step", priority: 99 },
+  ],
+  auth: "none",
+  freshnessClass: "periodic",
+};
+
+const propertyDocumentOperation: OperationDescriptor = {
+  source: manifest.source,
+  operation: "get-property-document",
+  description: "Retrieve one official housing document and test its exact property identity",
+  access: "read",
+  schemaVersion: "1.0.0",
+  parametersSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["candidateId", "propertyRef", "url", "topic"],
+    properties: {
+      candidateId: { type: "string", minLength: 1 },
+      propertyRef: { type: "string", minLength: 1 },
+      url: { type: "string", minLength: 1 },
+      topic: { enum: ["presale-permit", "tax", "transaction", "ownership", "planning"] },
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["candidateId", "propertyRef", "title", "body", "url", "topic", "identityMatch", "evidenceStatus"],
+    properties: {
+      candidateId: { type: "string", minLength: 1 },
+      propertyRef: { type: "string", minLength: 1 },
+      title: { type: "string", minLength: 1 },
+      body: { type: "string", minLength: 1 },
+      url: { type: "string", minLength: 1 },
+      topic: { enum: ["presale-permit", "tax", "transaction", "ownership", "planning"] },
+      publishedAt: { type: "string" },
+      identityMatch: { enum: ["matched", "unresolved"] },
+      evidenceStatus: { enum: ["source-verified", "unresolved"] },
     },
   },
   backends: [
@@ -119,7 +171,7 @@ function validWuhanUrl(value: string): boolean {
 }
 
 function topic(value: unknown): WuhanOfficialPage["topic"] {
-  return value === "presale-permit" || value === "mortgage" || value === "policy" || value === "other" ? value : "other";
+  return value === "presale-permit" || value === "mortgage" || value === "policy" || value === "tax" || value === "transaction" || value === "ownership" || value === "planning" || value === "other" ? value : "other";
 }
 
 function parsePage(body: string, url: string, requestedTopic: unknown): WuhanOfficialPage {
@@ -129,6 +181,20 @@ function parsePage(body: string, url: string, requestedTopic: unknown): WuhanOff
   const publishedAt = isoDate(meta(body, ["PubDate", "ArticleTime", "MakeTime"]) ?? bodyText.match(/20\d{2}[年./-]\d{1,2}[月./-]\d{1,2}/)?.[0]);
   if (!title || bodyText.length < 20) throw new Error("Wuhan official page lacked a stable title or body");
   return { title, body: bodyText, url, topic: topic(requestedTopic), ...(publishedAt ? { publishedAt } : {}) };
+}
+
+function parsePropertyDocument(body: string, parameters: Record<string, unknown>): WuhanPropertyDocument {
+  const page = parsePage(body, String(parameters["url"]), parameters["topic"]);
+  const propertyRef = String(parameters["propertyRef"]);
+  const normalizedBody = `${page.title} ${page.body}`.toLocaleLowerCase();
+  const identityMatch = normalizedBody.includes(propertyRef.toLocaleLowerCase()) ? "matched" : "unresolved";
+  return {
+    ...page,
+    candidateId: String(parameters["candidateId"]),
+    propertyRef,
+    identityMatch,
+    evidenceStatus: identityMatch === "matched" ? "source-verified" : "unresolved",
+  };
 }
 
 function invalid(request: SourceRequest, descriptor: OperationDescriptor, message: string): SourceResult {
@@ -162,7 +228,9 @@ export class WuhanHousingAdapter implements SourceAdapter {
         classifyError: ({ error }) => ({ status: "failed" as const, code: "source_drift" as const, message: error instanceof Error ? error.message : "Wuhan official page parser failed", retryable: true }),
         parse: ({ body, context }) => {
           const parameters = context.request.parameters as Record<string, unknown>;
-          return parsePage(body, String(parameters["url"]), parameters["topic"]);
+          return context.request.operation === propertyDocumentOperation.operation
+            ? parsePropertyDocument(body, parameters)
+            : parsePage(body, String(parameters["url"]), parameters["topic"]);
         },
       }),
       new OpenCliBackend({
@@ -174,7 +242,10 @@ export class WuhanHousingAdapter implements SourceAdapter {
           const parameters = context.request.parameters as Record<string, unknown>;
           const value = typeof data === "string" ? data : data && typeof data === "object" ? String((data as Record<string, unknown>)["markdown"] ?? (data as Record<string, unknown>)["content"] ?? "") : "";
           if (!value) throw new Error("Wuhan browser reader returned no page content");
-          return parsePage(`<title>Wuhan official page</title><article>${value}</article>`, String(parameters["url"]), parameters["topic"]);
+          const wrapped = `<title>Wuhan official page</title><article>${value}</article>`;
+          return context.request.operation === propertyDocumentOperation.operation
+            ? parsePropertyDocument(wrapped, parameters)
+            : parsePage(wrapped, String(parameters["url"]), parameters["topic"]);
         },
       }),
       new ManualStepBackend({ name: "wuhan-housing-manual", description: "Open the Wuhan official page in a browser and retry" }),
@@ -182,7 +253,7 @@ export class WuhanHousingAdapter implements SourceAdapter {
   }
 
   manifest() { return manifest; }
-  operations() { return [pageOperation]; }
+  operations() { return [pageOperation, propertyDocumentOperation]; }
 
   async execute(request: SourceRequest, _runtime: SourceRuntime): Promise<SourceResult> {
     const descriptor = this.operations().find((item) => item.operation === request.operation);
@@ -190,16 +261,19 @@ export class WuhanHousingAdapter implements SourceAdapter {
     const validation = validateSourceRequest(request, descriptor.parametersSchema);
     if (!validation.ok) return { ...invalid(request, descriptor, validation.failure.message), failure: validation.failure, warnings: validation.issues.map((issue) => ({ code: "validation_issue", message: issue.message, field: issue.path })) };
     const url = String((validation.value.parameters as Record<string, unknown>)["url"]);
-    if (!validWuhanUrl(url)) return invalid(request, descriptor, "get-official-page requires an https URL on an allowlisted Wuhan official host");
+    if (!validWuhanUrl(url)) return invalid(request, descriptor, "official housing URL must be HTTPS on an allowlisted host");
     return this.#router.execute(validation.value, descriptor);
   }
 
   async health(runtime: SourceHealthRuntime) {
     const startedAt = runtime.now();
     const checkedAt = startedAt.toISOString();
-    const operations = await probeOperationHealth({ operation: pageOperation, router: this.#router, parameters: { url: "https://gjj.wuhan.gov.cn/bsfw/ywzl/ywzn/dkyw/202412/t20241219_2504837.html", topic: "mortgage" }, runtime });
-    return aggregateSourceHealth({ source: manifest.source, displayName: manifest.displayName, checkedAt, durationMs: Math.max(0, runtime.now().getTime() - startedAt.getTime()), operations: [operations] });
+    const operations = await Promise.all([
+      probeOperationHealth({ operation: pageOperation, router: this.#router, parameters: { url: "https://gjj.wuhan.gov.cn/bsfw/ywzl/ywzn/dkyw/202412/t20241219_2504837.html", topic: "mortgage" }, runtime }),
+      probeOperationHealth({ operation: propertyDocumentOperation, router: this.#router, parameters: { candidateId: "probe-candidate", propertyRef: "probe-document", url: "https://gjj.wuhan.gov.cn/bsfw/ywzl/ywzn/dkyw/202412/t20241219_2504837.html", topic: "ownership" }, runtime }),
+    ]);
+    return aggregateSourceHealth({ source: manifest.source, displayName: manifest.displayName, checkedAt, durationMs: Math.max(0, runtime.now().getTime() - startedAt.getTime()), operations });
   }
 }
 
-export const __test__ = { parsePage, validWuhanUrl };
+export const __test__ = { parsePage, parsePropertyDocument, validWuhanUrl };

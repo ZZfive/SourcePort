@@ -21,7 +21,8 @@
     "@sourceport/xiaohongshu": "*",
     "@sourceport/12365auto": "*",
     "@sourceport/wuhan-housing": "*",
-    "@sourceport/wuhan-listings": "*"
+    "@sourceport/wuhan-listings": "*",
+    "@sourceport/property-routes": "*"
   },
   "devDependencies": {
     "@sourceport/testing": "*"

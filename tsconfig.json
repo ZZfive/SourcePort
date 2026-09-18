@@ -51,6 +51,9 @@
     },
     {
       "path": "./sources/wuhan-listings"
+    },
+    {
+      "path": "./sources/property-routes"
     }
   ]
 }

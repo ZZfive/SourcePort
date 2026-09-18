@@ -74,6 +74,7 @@ research-cars Codex Skill
 | <code>@sourceport/car-research</code> | 有界跨来源买车研究和确定性报告 |
 | <code>@sourceport/property-research</code> | 按输入城市开展新房和二手房的有界研究、总包成本、双通勤和核验缺口 |
 | <code>@sourceport/wuhan-housing</code> | 武汉住更局、公积金和政府门户的官方住房页面获取与诊断 |
+| <code>@sourceport/property-routes</code> | 保存地图路线的出行方式、时段、耗时和距离证据，并保留浏览器/人工恢复路径 |
 | <code>@sourceport/decision-context</code> | 跨领域证据语料、来源准入、assessment 校验和提示旗标 |
 | <code>@sourceport/dongchedi</code> | 懂车帝搜索、车系、评价、款型和配置获取 |
 | <code>@sourceport/autohome</code> | 汽车之家品牌目录、评分、可靠性和竞品获取 |
@@ -131,7 +132,7 @@ discovery 线索时必须保持 `unverified`，不能派生 `pause`。
 | 小红书 | <code>search-notes</code> | 搜索有界社区样本 | 当前会话不可用，需要恢复 |
 | 小红书 | <code>get-note</code> | 获取一篇笔记 | 需要有效签名 URL 和会话 |
 | 小红书 | <code>get-comments</code> | 获取受限顶层评论 | 需要有效签名 URL 和会话 |
-| 武汉官方住房来源 | <code>get-official-page</code> | 获取住更局、公积金和政府门户官方住房页面 | 公共 HTTP healthy；浏览器 fallback 已显式诊断 |
+| 武汉官方住房来源 | <code>get-official-page</code> / <code>get-property-document</code> | 获取官方政策页面，并核验预售、交易、产权和规划文档是否匹配精确房产引用 | 公共 HTTP healthy；浏览器 fallback 已显式诊断 |
 | 武汉房源线索 | <code>search-listings</code> / <code>get-listing</code> | 获取武汉新房和二手房挂牌线索 | <code>search-listings</code> 公共 HTTP healthy；<code>get-listing</code> 当前漂移；结果仅为 lead-only |
 
 精确款型辅助驾驶输出会分别保留：
@@ -451,6 +452,16 @@ sourceport property-discover \
   --input-file private/property-brief.json \
   --discovery-file private/property-discovery.json \
   --output-file private/property-candidates.json
+~~~
+
+同一个 discovery 文件也可以加入 `property-routes:get-route-evidence`，通过
+`candidateId` 和 `anchorId` 把已核验的路线耗时写回候选；地图页面没有稳定耗时
+时会保留为未解析告警。房源快照和时间线单独保存：
+
+~~~bash
+sourceport property snapshot --input-file private/property-snapshot.json --store reports/property-snapshots
+sourceport property timeline --store reports/property-snapshots --candidate-id candidate-1
+sourceport property feedback --input-file private/property-feedback.json
 ~~~
 
 ### 决策背景工作流

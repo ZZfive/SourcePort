@@ -287,14 +287,8 @@ export interface PropertyResearchDependencies {
 
 export interface PropertyDiscoveryRequest {
   source: string;
-  operation: "search-listings";
-  parameters: {
-    url: string;
-    query: string;
-    kind: PropertyKind;
-    city: string;
-    limit?: number;
-  };
+  operation: "search-listings" | "get-route-evidence";
+  parameters: Record<string, unknown>;
 }
 
 export interface PropertyDiscoveryResult {

@@ -24,6 +24,10 @@ import {
   validatePropertyResearchBrief,
   type PropertyCandidateInput,
   type PropertyResearchReport,
+  clusterPropertyFeedback,
+  createFilePropertySnapshotStore,
+  diffPropertySnapshots,
+  type PropertySnapshot,
 } from "@sourceport/property-research";
 import {
   collectDecisionContext,
@@ -54,6 +58,7 @@ import { clusterFeedback, normalize12365Complaints, createFileFeedbackSnapshotSt
 import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 import { WuhanHousingAdapter } from "@sourceport/wuhan-housing";
 import { WuhanListingsAdapter } from "@sourceport/wuhan-listings";
+import { PropertyRoutesAdapter } from "@sourceport/property-routes";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
@@ -126,6 +131,7 @@ export function createDefaultRegistry(): SourceRegistry {
   registry.register(new XiaohongshuAdapter(openCliCommand));
   registry.register(new WuhanHousingAdapter({ openCliCommand }));
   registry.register(new WuhanListingsAdapter({ openCliCommand }));
+  registry.register(new PropertyRoutesAdapter({ openCliCommand }));
   return registry;
 }
 
@@ -460,6 +466,61 @@ export async function runCli(
       return discovered.status === "success" ? 0 : 1;
     }
 
+    if (command === "property") {
+      const subcommand = argv[1];
+      const parsed = parseArgs({
+        args: [...argv.slice(2)],
+        allowPositionals: false,
+        strict: true,
+        options: {
+          "input-file": { type: "string" },
+          store: { type: "string" },
+          "candidate-id": { type: "string" },
+          before: { type: "string" },
+          after: { type: "string" },
+          "output-file": { type: "string" },
+        },
+      });
+      if (subcommand === "snapshot") {
+        const inputFile = parsed.values["input-file"];
+        const storeDirectory = parsed.values.store;
+        if (!inputFile || !storeDirectory) {
+          writeJson(stderr, cliError("invalid_cli_input", "property snapshot requires --input-file and --store"));
+          return 2;
+        }
+        const snapshot = await readJsonFile(inputFile) as PropertySnapshot;
+        await createFilePropertySnapshotStore(storeDirectory).save(snapshot);
+        writeJson(stdout, snapshot);
+        return 0;
+      }
+      if (subcommand === "timeline") {
+        const storeDirectory = parsed.values.store;
+        if (!storeDirectory) {
+          writeJson(stderr, cliError("invalid_cli_input", "property timeline requires --store"));
+          return 2;
+        }
+        const snapshots = await createFilePropertySnapshotStore(storeDirectory).list(parsed.values["candidate-id"]);
+        const changes = snapshots.flatMap((snapshot, index) => diffPropertySnapshots(snapshots[index - 1], snapshot).map((change) => ({ snapshotId: snapshot.id, capturedAt: snapshot.capturedAt, ...change })));
+        writeJson(stdout, { candidateId: parsed.values["candidate-id"] ?? null, snapshots, changes });
+        return 0;
+      }
+      if (subcommand === "feedback") {
+        const inputFile = parsed.values["input-file"];
+        if (!inputFile) {
+          writeJson(stderr, cliError("invalid_cli_input", "property feedback requires --input-file"));
+          return 2;
+        }
+        const raw = await readJsonFile(inputFile);
+        const records = Array.isArray(raw) ? raw : raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>)["items"]) ? (raw as { items: unknown[] }).items : [];
+        const clusters = clusterPropertyFeedback(records as Parameters<typeof clusterPropertyFeedback>[0]);
+        await saveJsonFile(parsed.values["output-file"], clusters);
+        writeJson(stdout, clusters);
+        return 0;
+      }
+      writeJson(stderr, cliError("invalid_cli_input", "property expects snapshot, timeline, or feedback"));
+      return 2;
+    }
+
     if (command === "car-context" && argv[1] === "collect") {
       const parsed = parseArgs({
         args: [...argv.slice(2)],
@@ -736,7 +797,7 @@ export async function runCli(
       stderr,
       cliError(
         "invalid_cli_input",
-        "expected sources, capabilities, run, doctor, research-cars, research-property, property-discover, car-context collect, or context collect|compile command",
+        "expected sources, capabilities, run, doctor, research-cars, research-property, property-discover, property snapshot|timeline|feedback, car-context collect, or context collect|compile command",
       ),
     );
     return 2;

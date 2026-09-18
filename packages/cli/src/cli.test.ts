@@ -367,6 +367,24 @@ describe("SourcePort CLI", () => {
     }
   });
 
+  it("stores property snapshots and renders a change timeline", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sourceport-property-snapshot-cli-"));
+    const store = join(directory, "snapshots");
+    const first = join(directory, "first.json");
+    const second = join(directory, "second.json");
+    try {
+      await writeFile(first, JSON.stringify({ id: "s1", capturedAt: "2026-09-18T00:00:00Z", candidateId: "candidate-1", city: "示例城市", community: "示例小区", fields: { priceCny: 100 }, sourceEvidenceIds: ["e1"] }), "utf8");
+      await writeFile(second, JSON.stringify({ id: "s2", capturedAt: "2026-09-19T00:00:00Z", candidateId: "candidate-1", city: "示例城市", community: "示例小区", fields: { priceCny: 120 }, sourceEvidenceIds: ["e2"] }), "utf8");
+      expect(await runCli(["property", "snapshot", "--input-file", first, "--store", store], capture().io)).toBe(0);
+      expect(await runCli(["property", "snapshot", "--input-file", second, "--store", store], capture().io)).toBe(0);
+      const output = capture();
+      expect(await runCli(["property", "timeline", "--store", store, "--candidate-id", "candidate-1"], output.io)).toBe(0);
+      expect(JSON.parse(output.stdout.join("")).changes.at(-1)).toEqual(expect.objectContaining({ field: "priceCny", before: 100, after: 120 }));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("collects and compiles decision context with JSON sidecars", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sourceport-context-cli-"));
     const briefFile = join(directory, "context-brief.json");

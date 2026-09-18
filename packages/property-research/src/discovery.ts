@@ -29,6 +29,13 @@ interface ListingSearchData {
   items: ListingItem[];
 }
 
+interface RouteEvidenceData {
+  candidateId?: string;
+  anchorId?: string;
+  durationMinutes?: number;
+  evidenceStatus: "source-verified" | "unresolved";
+}
+
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -43,17 +50,23 @@ const requestSchema = {
     required: ["source", "operation", "parameters"],
     properties: {
       source: { type: "string", minLength: 1 },
-      operation: { const: "search-listings" },
+      operation: { enum: ["search-listings", "get-route-evidence"] },
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["url", "query", "kind", "city"],
+        required: ["url"],
         properties: {
           url: { type: "string", minLength: 1 },
           query: { type: "string", minLength: 1 },
           kind: { enum: ["new", "resale"] },
           city: { type: "string", minLength: 1 },
           limit: { type: "integer", minimum: 1, maximum: 30 },
+          candidateId: { type: "string", minLength: 1 },
+          anchorId: { type: "string", minLength: 1 },
+          origin: { type: "string", minLength: 1 },
+          destination: { type: "string", minLength: 1 },
+          mode: { enum: ["driving", "transit", "walking", "cycling"] },
+          departureWindow: { type: "string", minLength: 1 },
         },
       },
     },
@@ -61,7 +74,19 @@ const requestSchema = {
 } as const;
 
 export function validatePropertyDiscoveryRequests(input: unknown): ValidationResult<PropertyDiscoveryRequest[]> {
-  return validateOperationOutput(input, requestSchema) as ValidationResult<PropertyDiscoveryRequest[]>;
+  const result = validateOperationOutput(input, requestSchema) as ValidationResult<PropertyDiscoveryRequest[]>;
+  if (!result.ok) return result;
+  const issues: Array<{ path: string; message: string }> = [];
+  result.value.forEach((request, index) => {
+    const required = request.operation === "search-listings"
+      ? ["query", "kind", "city"]
+      : ["candidateId", "anchorId", "origin", "destination", "mode"];
+    for (const field of required) {
+      const value = request.parameters[field];
+      if (typeof value !== "string" || !value.trim()) issues.push({ path: `${index}.parameters.${field}`, message: `must provide ${field} for ${request.operation}` });
+    }
+  });
+  return issues.length ? { ok: false, issues } : result;
 }
 
 function listing(item: ListingItem, source: string): PropertyListing {
@@ -93,11 +118,12 @@ function candidate(item: ListingItem, source: string, evidence: EvidenceRecord[]
   };
 }
 
-function resultData(result: SourceResult): ListingSearchData | undefined {
+function resultData(result: SourceResult): ListingSearchData | RouteEvidenceData | undefined {
   if (!result.data || !object(result.data)) return undefined;
   const value = result.data as Record<string, unknown>;
-  if (!Array.isArray(value["items"])) return undefined;
-  return value as unknown as ListingSearchData;
+  if (Array.isArray(value["items"])) return value as unknown as ListingSearchData;
+  if (value["evidenceStatus"] === "source-verified" || value["evidenceStatus"] === "unresolved") return value as unknown as RouteEvidenceData;
+  return undefined;
 }
 
 export async function discoverPropertyCandidates(
@@ -122,7 +148,25 @@ export async function discoverPropertyCandidates(
     recoveryActions.push(...result.recoveryActions);
     const data = resultData(result);
     if (!data) continue;
-    candidates.push(...data.items.map((item) => candidate(item, request.source, result.evidence)));
+    if (request.operation === "search-listings" && "items" in data) {
+      candidates.push(...data.items.map((item) => candidate(item, request.source, result.evidence)));
+      continue;
+    }
+    if (request.operation === "get-route-evidence") {
+      const route = data as RouteEvidenceData;
+      if (!route.candidateId || !route.anchorId) {
+        warnings.push({ code: "route_context_missing", message: "route evidence did not identify a candidate and commute anchor" });
+        continue;
+      }
+      const target = candidates.find((item) => item.candidateId === route.candidateId);
+      if (target && route.durationMinutes !== undefined) {
+        target.commuteMinutes = { ...(target.commuteMinutes ?? {}), [route.anchorId]: route.durationMinutes };
+        target.commuteEvidence = { ...(target.commuteEvidence ?? {}), [route.anchorId]: [...(target.commuteEvidence?.[route.anchorId] ?? []), ...result.evidence.map((item) => item.id)] };
+        target.evidence = [...(target.evidence ?? []), ...result.evidence];
+      } else {
+        warnings.push({ code: "route_evidence_unresolved", message: target ? `route evidence for '${route.anchorId}' did not expose a duration` : `route evidence referenced unknown candidate '${route.candidateId}'` });
+      }
+    }
   }
 
   const deduplicated = [...new Map(candidates.map((item) => [item.candidateId, item])).values()];

@@ -80,6 +80,7 @@ The repository currently contains:
 | <code>@sourceport/car-research</code> | Bounded cross-source car research and deterministic reporting |
 | <code>@sourceport/property-research</code> | Bounded configurable new/resale property research, all-in costs, dual commutes, and verification gaps |
 | <code>@sourceport/wuhan-housing</code> | Official Wuhan housing, presale, government, and provident-fund page acquisition and diagnosis |
+| <code>@sourceport/property-routes</code> | Public map route-time evidence with mode, departure window, and manual/browser recovery |
 | <code>@sourceport/decision-context</code> | Cross-domain evidence corpus, source admission, assessment validation, and advisory flags |
 | <code>@sourceport/dongchedi</code> | Dongchedi search, series, review, trim, and configuration acquisition |
 | <code>@sourceport/autohome</code> | Autohome brand catalog, score, reliability, and competitor acquisition |
@@ -145,8 +146,9 @@ remain `unverified` and cannot do so.
 | Xiaohongshu | <code>search-notes</code> | Search a bounded community sample | Current session unavailable; recovery required |
 | Xiaohongshu | <code>get-note</code> | Retrieve one note | Requires a valid signed note URL/session |
 | Xiaohongshu | <code>get-comments</code> | Retrieve bounded top-level comments | Requires a valid signed note URL/session |
-| Wuhan official housing | <code>get-official-page</code> | Retrieve allowlisted housing, presale, government, and provident-fund pages | Public HTTP healthy; browser fallback diagnosed explicitly |
+| Wuhan official housing | <code>get-official-page</code> / <code>get-property-document</code> | Retrieve official policy pages and test exact property-reference matches for permit, transaction, ownership, and planning documents | Public HTTP healthy; browser fallback diagnosed explicitly |
 | Wuhan listing leads | <code>search-listings</code> / <code>get-listing</code> | Retrieve Wuhan new and resale listing leads | <code>search-listings</code> public HTTP healthy; <code>get-listing</code> currently drifted; results are lead-only |
+| Public map routes | <code>get-route-evidence</code> | Retrieve route duration/distance for a candidate commute anchor | Public HTTP and browser fallback; unresolved when the map page exposes no stable duration |
 
 Exact-trim driving-assistance output keeps claimed automation level, concrete
 capabilities, operating domains, perception hardware, system/version,
@@ -467,6 +469,17 @@ sourceport property-discover \
   --input-file private/property-brief.json \
   --discovery-file private/property-discovery.json \
   --output-file private/property-candidates.json
+~~~
+
+The same discovery file can include `property-routes:get-route-evidence` requests
+with `candidateId` and `anchorId`; verified durations are attached to the matching
+candidate and unresolved route pages remain explicit warnings. Property snapshots
+and timelines are stored separately:
+
+~~~bash
+sourceport property snapshot --input-file private/property-snapshot.json --store reports/property-snapshots
+sourceport property timeline --store reports/property-snapshots --candidate-id candidate-1
+sourceport property feedback --input-file private/property-feedback.json
 ~~~
 
 Inline JSON is also supported:

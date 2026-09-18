@@ -34,6 +34,9 @@ ordering and reporting rather than hard eligibility.
   operation;
 - public HTTP, OpenCLI browser fallback, manual recovery, parser checks, and
   doctor probe are all represented in the operation contract;
+- `get-property-document` now keeps the candidate ID and property reference
+  beside the official page and exposes `identityMatch` instead of treating a
+  generic policy page as exact-property evidence;
 - verified official Wuhan mortgage and presale-query pages are documented as
   source probes, while exact-property claims remain unresolved until a
   project/property document is supplied.
@@ -61,12 +64,16 @@ own provenance and recovery path:
    covers page retrieval; add exact-project permit and filing probes next.
 3. Tax and transaction: add official tax/transaction evidence only after the
    candidate is bound to a community, building, unit, and room.
-4. Ownership and planning: add title, encumbrance, restriction, delivery, and
-   planning evidence as separate operations; never merge them into a listing.
-5. Route evidence: add a route adapter that preserves travel mode, departure
-   window, route assumptions, retrieval time, and fallback/manual recovery.
-6. Add property snapshots and feedback clusters only after exact community and
-   building identity can be resolved.
+4. Ownership and planning: the official document operation now accepts separate
+   ownership and planning topics and keeps exact identity unresolved until the
+   returned document names the property reference.
+5. Route evidence: `@sourceport/property-routes` preserves travel mode,
+   departure window, retrieval time, route assumptions, and browser/manual
+   recovery. Discovery requests can attach verified durations to a candidate
+   commute anchor.
+6. Property snapshots and feedback clusters are available through the property
+   package and `sourceport property snapshot|timeline|feedback`; snapshots keep
+   evidence IDs and diffs never turn a lead into title proof.
 
 The current CLI accepts normalized candidate fixtures so these source phases
 can be tested independently from the deterministic research engine:
