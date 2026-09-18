@@ -356,7 +356,7 @@ describe("SourcePort CLI", () => {
       const output = capture();
       const exitCode = await runCli(["property-discover", "--input-file", briefFile, "--discovery-file", discoveryFile, "--output-file", outputFile], { researchExecutor: execute, ...output.io });
       expect(exitCode).toBe(0);
-      expect(JSON.parse(await readFile(outputFile, "utf8"))).toEqual(expect.objectContaining({ candidates: [expect.objectContaining({ candidateId: "fixture-listings:lead-1", community: "测试项目", city: "示例城市" })] }));
+      expect(JSON.parse(await readFile(outputFile, "utf8"))).toEqual(expect.objectContaining({ candidates: [expect.objectContaining({ candidateId: "fixture-listings:new:lead-1", community: "测试项目", city: "示例城市" })] }));
       expect(output.stderr).toEqual([]);
       const researchOutput = capture();
       const researchExit = await runCli(["research-property", "--input-file", briefFile, "--candidates-file", outputFile, "--format", "md"], { ...researchOutput.io });

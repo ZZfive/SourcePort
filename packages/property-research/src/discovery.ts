@@ -103,7 +103,7 @@ function listing(item: ListingItem, source: string): PropertyListing {
 
 function candidate(item: ListingItem, source: string, evidence: EvidenceRecord[]): PropertyCandidateInput {
   return {
-    candidateId: `${source}:${item.candidateId}`,
+    candidateId: `${source}:${item.kind}:${item.candidateId}`,
     kind: item.kind,
     city: item.city,
     ...(item.district ? { district: item.district } : {}),
