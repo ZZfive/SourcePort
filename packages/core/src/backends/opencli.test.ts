@@ -55,6 +55,38 @@ describe("OpenCliBackend", () => {
     expect(result.failure?.code).toBe("unexpected_source_shape");
   });
 
+  it("normalizes text only when the stdout contract explicitly selects text", async () => {
+    const backend = new OpenCliBackend({
+      name: "opencli-text",
+      command: process.execPath,
+      args: () => ["-e", "console.log('markdown listing')", "--"],
+      jsonOutput: true,
+      outputFormat: "text",
+      parse: (data) => ({ value: String(data).trim() }),
+    });
+
+    const result = await backend.execute(context);
+
+    expect(result.status).toBe("success");
+    expect(result.data).toEqual({ value: "markdown listing" });
+  });
+
+  it("preserves a human-verification block when a text page is a CAPTCHA", async () => {
+    const backend = new OpenCliBackend({
+      name: "opencli-captcha",
+      command: process.execPath,
+      args: () => ["-e", "console.log('CAPTCHA\n人机验证\n点击按钮开始验证')", "--"],
+      outputFormat: "text",
+      parse: (data) => ({ value: String(data) }),
+    });
+
+    const result = await backend.execute(context);
+
+    expect(result.status).toBe("blocked");
+    expect(result.failure?.code).toBe("human_verification_required");
+    expect(result.recoveryActions).toEqual([expect.objectContaining({ kind: "complete_human_verification" })]);
+  });
+
   it("appends JSON output and normalizes parsed data", async () => {
     const backend = new OpenCliBackend({
       name: "opencli",

@@ -16,6 +16,8 @@ export interface OpenCliBackendOptions {
   command?: string;
   args(context: BackendExecutionContext): string[];
   jsonOutput?: boolean;
+  /** stdout contract; independent of whether the command accepts -f json. Defaults to JSON. */
+  outputFormat?: "json" | "text";
   parse?(data: unknown, context: BackendExecutionContext): unknown;
 }
 
@@ -162,9 +164,31 @@ export class OpenCliBackend implements Backend {
 
       let data: unknown;
       try {
-        const parsed = JSON.parse(output.stdout) as unknown;
+        const parsed = this.#options.outputFormat === "text"
+          ? output.stdout
+          : JSON.parse(output.stdout) as unknown;
         data = this.#options.parse ? this.#options.parse(parsed, context) : parsed;
       } catch {
+        if (/captcha|人机验证|安全验证|点击按钮开始验证/i.test(output.stdout)) {
+          return {
+            requestId,
+            source: context.request.source,
+            operation: context.request.operation,
+            operationSchemaVersion: context.operation.schemaVersion,
+            status: "blocked",
+            backend: this.name,
+            evidence: [],
+            warnings: [],
+            failure: createFailure(
+              "human_verification_required",
+              "OpenCLI page requires human verification",
+              "transport",
+              undefined,
+              this.name,
+            ),
+            recoveryActions: [humanVerificationRecovery("Complete the source verification in the OpenCLI browser session")],
+          };
+        }
         return {
           requestId,
           source: context.request.source,
@@ -176,12 +200,17 @@ export class OpenCliBackend implements Backend {
           warnings: [],
           failure: createFailure(
             "unexpected_source_shape",
-            "OpenCLI output was not valid JSON or failed operation normalization",
+            "OpenCLI output did not match the configured format or failed operation normalization",
             "parsing",
             false,
             this.name,
           ),
-          recoveryActions: [],
+          recoveryActions: [{
+            kind: "report_source_drift",
+            description: "Check the OpenCLI output format and source adapter normalization",
+            requiresUser: false,
+            backend: this.name,
+          }],
         };
       }
 
