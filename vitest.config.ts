@@ -8,6 +8,7 @@ export default defineConfig({
       "@sourceport/wuhan-housing": fileURLToPath(new URL("./sources/wuhan-housing/src/index.ts", import.meta.url)),
       "@sourceport/wuhan-listings": fileURLToPath(new URL("./sources/wuhan-listings/src/index.ts", import.meta.url)),
       "@sourceport/property-routes": fileURLToPath(new URL("./sources/property-routes/src/index.ts", import.meta.url)),
+      "@sourceport/wuhan-property-miniprograms": fileURLToPath(new URL("./sources/wuhan-property-miniprograms/src/index.ts", import.meta.url)),
       "@sourceport/core": fileURLToPath(
         new URL("./packages/core/src/index.ts", import.meta.url),
       ),

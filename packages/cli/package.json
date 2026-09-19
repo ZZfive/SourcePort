@@ -22,7 +22,8 @@
     "@sourceport/12365auto": "*",
     "@sourceport/wuhan-housing": "*",
     "@sourceport/wuhan-listings": "*",
-    "@sourceport/property-routes": "*"
+    "@sourceport/property-routes": "*",
+    "@sourceport/wuhan-property-miniprograms": "*"
   },
   "devDependencies": {
     "@sourceport/testing": "*"

@@ -59,6 +59,7 @@ import { XiaohongshuAdapter } from "@sourceport/xiaohongshu";
 import { WuhanHousingAdapter } from "@sourceport/wuhan-housing";
 import { WuhanListingsAdapter } from "@sourceport/wuhan-listings";
 import { PropertyRoutesAdapter } from "@sourceport/property-routes";
+import { WuhanPropertyMiniProgramsAdapter } from "@sourceport/wuhan-property-miniprograms";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
@@ -132,6 +133,7 @@ export function createDefaultRegistry(): SourceRegistry {
   registry.register(new WuhanHousingAdapter({ openCliCommand }));
   registry.register(new WuhanListingsAdapter({ openCliCommand }));
   registry.register(new PropertyRoutesAdapter({ openCliCommand }));
+  registry.register(new WuhanPropertyMiniProgramsAdapter());
   return registry;
 }
 

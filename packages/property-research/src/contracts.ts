@@ -287,7 +287,7 @@ export interface PropertyResearchDependencies {
 
 export interface PropertyDiscoveryRequest {
   source: string;
-  operation: "search-listings" | "get-route-evidence";
+  operation: "search-listings" | "get-route-evidence" | "record-observation";
   parameters: Record<string, unknown>;
 }
 

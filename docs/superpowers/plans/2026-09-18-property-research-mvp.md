@@ -74,6 +74,11 @@ own provenance and recovery path:
 6. Property snapshots and feedback clusters are available through the property
    package and `sourceport property snapshot|timeline|feedback`; snapshots keep
    evidence IDs and diffs never turn a lead into title proof.
+7. `@sourceport/wuhan-property-miniprograms` provides a manual/browser-assisted
+   `record-observation` operation for named mini-programs. It requires a share
+   reference or browser URL, preserves the observation as `claimed`, and can
+   enrich an existing discovery candidate without presenting it as official
+   title, transaction, or ownership evidence.
 
 The current CLI accepts normalized candidate fixtures so these source phases
 can be tested independently from the deterministic research engine:

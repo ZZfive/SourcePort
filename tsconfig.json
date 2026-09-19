@@ -54,6 +54,9 @@
     },
     {
       "path": "./sources/property-routes"
+    },
+    {
+      "path": "./sources/wuhan-property-miniprograms"
     }
   ]
 }

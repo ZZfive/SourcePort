@@ -75,6 +75,7 @@ research-cars Codex Skill
 | <code>@sourceport/property-research</code> | 按输入城市开展新房和二手房的有界研究、总包成本、双通勤和核验缺口 |
 | <code>@sourceport/wuhan-housing</code> | 武汉住更局、公积金和政府门户的官方住房页面获取与诊断 |
 | <code>@sourceport/property-routes</code> | 保存地图路线的出行方式、时段、耗时和距离证据，并保留浏览器/人工恢复路径 |
+| <code>@sourceport/wuhan-property-miniprograms</code> | 接收武汉房产小程序或浏览器辅助观察，保留分享标识并明确标记为 claimed |
 | <code>@sourceport/decision-context</code> | 跨领域证据语料、来源准入、assessment 校验和提示旗标 |
 | <code>@sourceport/dongchedi</code> | 懂车帝搜索、车系、评价、款型和配置获取 |
 | <code>@sourceport/autohome</code> | 汽车之家品牌目录、评分、可靠性和竞品获取 |
@@ -463,6 +464,10 @@ sourceport property snapshot --input-file private/property-snapshot.json --store
 sourceport property timeline --store reports/property-snapshots --candidate-id candidate-1
 sourceport property feedback --input-file private/property-feedback.json
 ~~~
+
+同一个 discovery 文件还可以加入
+`wuhan-property-miniprograms:record-observation`。只有提供小程序分享标识或
+浏览器 URL 时才会写回候选；在官方来源核验前，观察始终标记为 `claimed`。
 
 ### 决策背景工作流
 

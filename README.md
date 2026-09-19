@@ -81,6 +81,7 @@ The repository currently contains:
 | <code>@sourceport/property-research</code> | Bounded configurable new/resale property research, all-in costs, dual commutes, and verification gaps |
 | <code>@sourceport/wuhan-housing</code> | Official Wuhan housing, presale, government, and provident-fund page acquisition and diagnosis |
 | <code>@sourceport/property-routes</code> | Public map route-time evidence with mode, departure window, and manual/browser recovery |
+| <code>@sourceport/wuhan-property-miniprograms</code> | Claimed, provenance-preserving observations from Wuhan property mini-programs and browser-assisted flows |
 | <code>@sourceport/decision-context</code> | Cross-domain evidence corpus, source admission, assessment validation, and advisory flags |
 | <code>@sourceport/dongchedi</code> | Dongchedi search, series, review, trim, and configuration acquisition |
 | <code>@sourceport/autohome</code> | Autohome brand catalog, score, reliability, and competitor acquisition |
@@ -149,6 +150,7 @@ remain `unverified` and cannot do so.
 | Wuhan official housing | <code>get-official-page</code> / <code>get-property-document</code> | Retrieve official policy pages and test exact property-reference matches for permit, transaction, ownership, and planning documents | Public HTTP healthy; browser fallback diagnosed explicitly |
 | Wuhan listing leads | <code>search-listings</code> / <code>get-listing</code> | Retrieve Wuhan new and resale listing leads | <code>search-listings</code> public HTTP healthy; <code>get-listing</code> currently drifted; results are lead-only |
 | Public map routes | <code>get-route-evidence</code> | Retrieve route duration/distance for a candidate commute anchor | Public HTTP and browser fallback; unresolved when the map page exposes no stable duration |
+| Wuhan property mini-programs | <code>record-observation</code> | Record a named mini-program or browser-assisted observation with a share reference | Human-assisted; observations are claimed and require provenance |
 
 Exact-trim driving-assistance output keeps claimed automation level, concrete
 capabilities, operating domains, perception hardware, system/version,
@@ -481,6 +483,10 @@ sourceport property snapshot --input-file private/property-snapshot.json --store
 sourceport property timeline --store reports/property-snapshots --candidate-id candidate-1
 sourceport property feedback --input-file private/property-feedback.json
 ~~~
+
+It can also include `wuhan-property-miniprograms:record-observation` requests.
+These enrich an existing candidate only when a share reference or browser URL is
+present, and remain `claimed` until an official source verifies the property.
 
 Inline JSON is also supported:
 
