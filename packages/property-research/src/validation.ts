@@ -37,6 +37,7 @@ const briefSchema = object({
 }, ["query", "market", "housingTypes", "budget", "commuteAnchors"]);
 
 const provenance = { id: text, source: text, sourceUrl: url, retrievedAt: timestamp, market: text, candidateId: text, validUntil: timestamp, verification };
+const priceObservation = object({ id: text, kind: { enum: ["asking", "transaction", "offer", "tax-assessment"] }, priceCny: range, source: text, sourceUrl: url, observedAt: timestamp, verification, scope: text }, ["id", "kind", "priceCny", "source", "observedAt"]);
 const cost = object({
   ...provenance, component: { enum: ["purchase-price", "deed-tax", "vat", "agency-fee", "registration", "maintenance-fund", "renovation", "parking", "loan-fee", "furnishings", "seller-tax", "other"] },
   minimumCny: nonnegative, maximumCny: nonnegative, mandatory: { type: "boolean" }, applicability: text,
@@ -59,7 +60,7 @@ const candidateSchema = object({
   building: text, unit: text, room: text, areaSqm: positive, bedrooms: count, livingRooms: count, floor: text,
   constructionYear: { type: "integer", minimum: 1800, maximum: 2200 }, propertyRightsYears: positive,
   developer: text, deliveryDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
-  listing, listings: { type: "array", maxItems: 64, items: listing }, purchasePrice: range,
+  listing, listings: { type: "array", maxItems: 64, items: listing }, askingPrice: range, priceObservations: { type: "array", maxItems: 256, items: priceObservation }, purchasePrice: range,
   costEvidence: { type: "array", maxItems: 256, items: cost }, riskEvidence: { type: "array", maxItems: 256, items: risk },
   commuteMinutes: { type: "object", additionalProperties: nonnegative }, commuteEvidence: references, fieldEvidence: references,
   evidence: { type: "array", maxItems: 512, items: evidence }, sourceUrls: { type: "array", maxItems: 512, items: url },
@@ -89,7 +90,7 @@ export function validatePropertyCandidates(input: unknown): ValidationResult<Pro
     const path = `candidates[${index}]`;
     if (ids.has(candidate.candidateId)) issues.push({ path, message: "candidateId must identify one source observation uniquely" });
     ids.add(candidate.candidateId);
-    const ranges = [candidate.purchasePrice, candidate.listing?.priceCny, ...(candidate.listings ?? []).map(x => x.priceCny), ...(candidate.costEvidence ?? [])];
+    const ranges = [candidate.purchasePrice, candidate.askingPrice, candidate.listing?.priceCny, ...(candidate.listings ?? []).map(x => x.priceCny), ...(candidate.priceObservations ?? []).map(x => x.priceCny), ...(candidate.costEvidence ?? [])];
     if (ranges.some(x => x && x.minimumCny > x.maximumCny)) issues.push({ path, message: "money range minimum exceeds maximum" });
     const records = [...(candidate.evidence ?? []), ...(candidate.costEvidence ?? []), ...(candidate.riskEvidence ?? [])];
     for (const row of records) {
@@ -100,7 +101,7 @@ export function validatePropertyCandidates(input: unknown): ValidationResult<Pro
     const available = new Set((candidate.evidence ?? []).map(x => x.id));
     const refs = [...Object.values(candidate.fieldEvidence ?? {}).flat(), ...Object.values(candidate.commuteEvidence ?? {}).flat()];
     for (const ref of refs) if (!available.has(ref)) issues.push({ path, message: `unresolved evidence reference ${ref}` });
-    const timestamps = [...records.flatMap(row => [row.retrievedAt, "validUntil" in row ? row.validUntil : undefined]), candidate.listing?.retrievedAt, candidate.listing?.publishedAt,
+    const timestamps = [...records.flatMap(row => [row.retrievedAt, "validUntil" in row ? row.validUntil : undefined]), ...(candidate.priceObservations ?? []).map(row => row.observedAt), candidate.listing?.retrievedAt, candidate.listing?.publishedAt,
       ...(candidate.listings ?? []).flatMap(row => [row.retrievedAt, row.publishedAt])];
     if (timestamps.some(x => x !== undefined && !Number.isFinite(Date.parse(x)))) issues.push({ path, message: "invalid timestamp" });
     if (candidate.deliveryDate && (!Number.isFinite(Date.parse(candidate.deliveryDate)) || new Date(candidate.deliveryDate).toISOString().slice(0, 10) !== candidate.deliveryDate)) issues.push({ path, message: "invalid delivery date" });

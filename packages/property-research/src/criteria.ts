@@ -23,6 +23,14 @@ function evaluateCriterion(criterion: PropertyCriterion, candidate: PropertyCand
     if (cost.status !== "known") return result(criterion, "unknown", cost.reasons.join("; ") || "all-in cost is not fully evidenced", cost.evidenceIds);
     return result(criterion, cost.range!.maximumCny <= maximum ? "pass" : "fail", `known all-in range ${cost.range!.minimumCny}–${cost.range!.maximumCny}`, cost.evidenceIds);
   }
+  if (criterion.key === "budget.asking.maxCny") {
+    const maximum = numberRequirement(criterion.requirement);
+    if (maximum === undefined) return result(criterion, "conflict", "asking-price requirement must include a numeric maximum");
+    if (!candidate.askingPrice) return result(criterion, "unknown", "asking price is missing");
+    if (candidate.askingPrice.minimumCny > maximum) return result(criterion, "fail", `asking price minimum ${candidate.askingPrice.minimumCny} exceeds ${maximum}`);
+    if (candidate.askingPrice.maximumCny > maximum) return result(criterion, "unknown", `asking price range ${candidate.askingPrice.minimumCny}–${candidate.askingPrice.maximumCny} crosses ${maximum}`);
+    return result(criterion, "pass", `asking price range ${candidate.askingPrice.minimumCny}–${candidate.askingPrice.maximumCny}; transaction price remains unverified`);
+  }
   if (criterion.key === "layout.bedrooms") {
     const wanted = numberRequirement(criterion.requirement);
     if (wanted === undefined) return result(criterion, "conflict", "bedroom requirement must be numeric");

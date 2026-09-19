@@ -27,6 +27,7 @@ const manifest = {
 export type MiniProgramName = "fang-mini-program" | "beike-mini-program" | "wuchang-housing-market" | "wufang-service" | "other";
 export type MiniProgramChannel = "wechat-mini-program" | "browser-share" | "manual-export";
 export type PropertyKind = "new" | "resale";
+export type PropertyPriceKind = "asking" | "transaction" | "offer" | "tax-assessment";
 
 export interface MiniProgramObservation {
   candidateId: string;
@@ -47,6 +48,7 @@ export interface MiniProgramObservation {
   bedrooms?: number;
   livingRooms?: number;
   purchasePrice?: { minimumCny: number; maximumCny: number };
+  priceKind: PropertyPriceKind;
   status?: "available" | "reserved" | "sold" | "unknown";
   notes?: string;
   evidenceStatus: "claimed";
@@ -86,6 +88,7 @@ const observationOperation: OperationDescriptor = {
         required: ["minimumCny", "maximumCny"],
         properties: { minimumCny: { type: "number", minimum: 0 }, maximumCny: { type: "number", minimum: 0 } },
       },
+      priceKind: { enum: ["asking", "transaction", "offer", "tax-assessment"] },
       status: { enum: ["available", "reserved", "sold", "unknown"] },
       notes: { type: "string", minLength: 1 },
     },
@@ -93,7 +96,7 @@ const observationOperation: OperationDescriptor = {
   outputSchema: {
     type: "object",
     additionalProperties: false,
-    required: ["candidateId", "program", "channel", "city", "kind", "community", "observedAt", "evidenceStatus"],
+    required: ["candidateId", "program", "channel", "city", "kind", "community", "observedAt", "priceKind", "evidenceStatus"],
     properties: {
       candidateId: { type: "string" },
       program: { enum: ["fang-mini-program", "beike-mini-program", "wuchang-housing-market", "wufang-service", "other"] },
@@ -113,6 +116,7 @@ const observationOperation: OperationDescriptor = {
       bedrooms: { type: "integer" },
       livingRooms: { type: "integer" },
       purchasePrice: { type: "object" },
+      priceKind: { enum: ["asking", "transaction", "offer", "tax-assessment"] },
       status: { enum: ["available", "reserved", "sold", "unknown"] },
       notes: { type: "string" },
       evidenceStatus: { const: "claimed" },
@@ -145,6 +149,9 @@ function observation(parameters: Record<string, unknown>): MiniProgramObservatio
   const purchasePrice = value && typeof value === "object" && !Array.isArray(value)
     ? { minimumCny: Number((value as Record<string, unknown>)["minimumCny"]), maximumCny: Number((value as Record<string, unknown>)["maximumCny"]) }
     : undefined;
+  const priceKind = parameters["priceKind"] === "transaction" || parameters["priceKind"] === "offer" || parameters["priceKind"] === "tax-assessment"
+    ? parameters["priceKind"] as PropertyPriceKind
+    : "asking" as const;
   return {
     candidateId: String(parameters["candidateId"]),
     program: parameters["program"] as MiniProgramName,
@@ -164,6 +171,7 @@ function observation(parameters: Record<string, unknown>): MiniProgramObservatio
     ...(parameters["bedrooms"] === undefined ? {} : { bedrooms: Number(parameters["bedrooms"]) }),
     ...(parameters["livingRooms"] === undefined ? {} : { livingRooms: Number(parameters["livingRooms"]) }),
     ...(purchasePrice ? { purchasePrice } : {}),
+    priceKind,
     ...(status ? { status } : {}),
     ...(parameters["notes"] ? { notes: String(parameters["notes"]) } : {}),
     evidenceStatus: "claimed",

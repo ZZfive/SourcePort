@@ -22,7 +22,11 @@ function defaultCriteria(brief: PropertyResearchBrief) {
 function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBrief, now: Date): PropertyCandidate {
   const allInCost = calculateAllInCost({ market: brief.market.city, candidateIds: [input.candidateId], now, ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}), ...(input.costEvidence ? { costEvidence: input.costEvidence } : {}) });
   const financing = calculateMortgageScenarios({ ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}), allInCost, ...(brief.financing ? { downPaymentRatios: brief.financing.downPaymentRatios, annualRates: brief.financing.annualRates, termsMonths: brief.financing.termsMonths } : {}) });
-  const criteria = [...defaultCriteria(brief), ...(brief.criteria ?? [])];
+  const explicitCriteria = new Set((brief.criteria ?? []).map((criterion) => criterion.key));
+  const askingCriteria = input.askingPrice && !explicitCriteria.has("budget.asking.maxCny")
+    ? [{ key: "budget.asking.maxCny", label: "挂牌价上限（线索筛选）", kind: "hard" as const, priority: 99, requirement: { max: brief.budget.maximumAllInCny } }]
+    : [];
+  const criteria = [...defaultCriteria(brief), ...askingCriteria, ...(brief.criteria ?? [])];
   const criterionResults = evaluatePropertyCriteria({ criteria, candidate: input, cost: allInCost });
   const commute = brief.commuteAnchors.map((anchor) => ({ anchorId: anchor.id, label: anchor.label, ...(input.commuteMinutes?.[anchor.id] === undefined ? {} : { minutes: input.commuteMinutes[anchor.id] }), status: input.commuteMinutes?.[anchor.id] === undefined ? "unknown" as const : "known" as const, evidenceIds: input.commuteEvidence?.[anchor.id] ?? [] }));
   const evidence = [...(input.evidence ?? []), ...(input.costEvidence ?? []).map(propertyCostEvidenceRecord), ...(input.riskEvidence ?? []).map(propertyRiskEvidenceRecord)];
@@ -30,13 +34,14 @@ function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBr
   const commuteValues = commute.flatMap(item => item.minutes === undefined ? [] : [item.minutes]);
   const observations = input.observations ?? [input];
   const conflicts: Array<{ field: string; values: unknown[] }> = [];
-  for (const field of ["kind", "city", "community", "address", "areaSqm", "bedrooms", "livingRooms", "floor", "constructionYear", "propertyRightsYears", "purchasePrice"]) {
+  for (const field of ["kind", "city", "community", "address", "areaSqm", "bedrooms", "livingRooms", "floor", "constructionYear", "propertyRightsYears", "askingPrice", "purchasePrice"]) {
     const values = [...new Map(observations.map(item => [JSON.stringify(item[field as keyof PropertyCandidateInput]), item[field as keyof PropertyCandidateInput]])).values()];
     if (values.length > 1) conflicts.push({ field, values });
   }
   if (conflicts.length) allInCost.reasons.push(`conflicting observations require reconciliation: ${conflicts.map(item => item.field).join(", ")}`);
   if (conflicts.length) allInCost.status = "conflict";
   const actionItems = [
+    ...(input.askingPrice && !input.purchasePrice ? ["将挂牌价与同小区近期成交价或明确议价证据核验后，再判断总包预算"] : []),
     ...(allInCost.status !== "known" ? ["核验交易价、税费、中介费、维修基金、装修和车位等总包组成"] : []),
     ...(input.kind === "new" ? ["核验项目、楼栋和房号对应的预售许可证、交付时间和备案合同"] : ["核验不动产权证、抵押/查封/租赁、卖方主体和存量房评估价"]),
     ...(commuteValues.length < brief.commuteAnchors.length ? [`补齐${brief.commuteAnchors.length}个通勤锚点的同口径路线证据、出行方式和时段`] : []),
@@ -48,6 +53,8 @@ function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBr
     identity: { city: input.city, ...(input.district ? { district: input.district } : {}), community: input.community, ...(input.address ? { address: input.address } : {}), ...(input.building ? { building: input.building } : {}), ...(input.unit ? { unit: input.unit } : {}), ...(input.room ? { room: input.room } : {}) },
     attributes: { ...(input.areaSqm === undefined ? {} : { areaSqm: input.areaSqm }), ...(input.bedrooms === undefined ? {} : { bedrooms: input.bedrooms }), ...(input.livingRooms === undefined ? {} : { livingRooms: input.livingRooms }), ...(input.floor ? { floor: input.floor } : {}), ...(input.constructionYear === undefined ? {} : { constructionYear: input.constructionYear }), ...(input.propertyRightsYears === undefined ? {} : { propertyRightsYears: input.propertyRightsYears }), ...(input.developer ? { developer: input.developer } : {}), ...(input.deliveryDate ? { deliveryDate: input.deliveryDate } : {}) },
     listings: [...new Map([...(input.listing ? [input.listing] : []), ...(input.listings ?? [])].map((item) => [item.listingId, item])).values()],
+    ...(input.askingPrice ? { askingPrice: input.askingPrice } : {}),
+    priceObservations: input.priceObservations ?? [],
     ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}),
     allInCost,
     financing,
@@ -103,7 +110,7 @@ export async function researchProperties(input: unknown, dependencies: PropertyR
     const aWorst = Math.max(...a.commute.flatMap((item) => item.minutes === undefined ? [] : [item.minutes]), Number.POSITIVE_INFINITY);
     const bWorst = Math.max(...b.commute.flatMap((item) => item.minutes === undefined ? [] : [item.minutes]), Number.POSITIVE_INFINITY);
     if (aWorst !== bWorst) return aWorst - bWorst;
-    return (a.allInCost.estimateRange?.minimumCny ?? Number.POSITIVE_INFINITY) - (b.allInCost.estimateRange?.minimumCny ?? Number.POSITIVE_INFINITY);
+    return (a.allInCost.estimateRange?.minimumCny ?? a.askingPrice?.minimumCny ?? Number.POSITIVE_INFINITY) - (b.allInCost.estimateRange?.minimumCny ?? b.askingPrice?.minimumCny ?? Number.POSITIVE_INFINITY);
   });
   const candidates = sorted.filter((candidate) => candidate.eligibility !== "rejected").slice(0, limits.finalCandidates);
   const rejected = sorted.filter((candidate) => candidate.eligibility === "rejected");
@@ -120,7 +127,7 @@ export async function researchProperties(input: unknown, dependencies: PropertyR
   if (scopeExclusions.length) limitations.push("some normalized candidates were excluded because their city or housing type did not match the brief");
   if (capExclusions.length) limitations.push(`candidate discovery was capped at ${limits.initialCandidates}`);
   if (!capExclusions.length && supplied.length >= limits.initialCandidates) limitations.push(`candidate discovery was capped at ${limits.initialCandidates}`);
-  if (evaluated.some((candidate) => candidate.allInCost.status !== "known")) limitations.push("some all-in totals remain estimates because tax, agency, renovation, or other applicable cost evidence is missing");
+  if (evaluated.some((candidate) => candidate.allInCost.status !== "known")) limitations.push("some all-in totals are unknown or estimates because a verified transaction price and/or tax, agency, renovation, or other applicable cost evidence is missing");
   if (evaluated.some((candidate) => candidate.financing.status !== "scenario")) limitations.push("monthly-payment scenarios remain unknown because down-payment, rate, or term inputs are missing");
   const byKind = { new: { input: supplied.filter(x => x.kind === "new").length, evaluated: evaluated.filter(x => x.kind === "new").length, displayed: candidates.filter(x => x.kind === "new").length }, resale: { input: supplied.filter(x => x.kind === "resale").length, evaluated: evaluated.filter(x => x.kind === "resale").length, displayed: candidates.filter(x => x.kind === "resale").length } };
   const exclusions = [...scopeExclusions, ...capExclusions, ...rejected.map(candidate => ({ candidateId: candidate.candidateId, reason: candidate.criterionResults.filter(x => x.status === "fail").map(x => x.message).join("; ") }))];

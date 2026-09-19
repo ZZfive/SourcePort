@@ -484,6 +484,13 @@ sourceport property timeline --store reports/property-snapshots --candidate-id c
 sourceport property feedback --input-file private/property-feedback.json
 ~~~
 
+Listing prices are stored as `askingPrice` and remain lead-level evidence. They
+are used only for preliminary asking-price screening and are never treated as a
+transaction price, total cost, or mortgage basis. Populate `purchasePrice` only
+with a verified transaction or explicitly documented offer, and keep comparable
+observations in `priceObservations` with their source, time, scope, and
+verification status.
+
 It can also include `wuhan-property-miniprograms:record-observation` requests.
 These enrich an existing candidate only when a share reference or browser URL is
 present, and remain `claimed` until an official source verifies the property.

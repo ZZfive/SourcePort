@@ -52,7 +52,7 @@ export function calculateAllInCost(input: {
   reasons.push(...excludedEvidence.map(x => `${x.id}: ${x.reason}`));
   const verified = sumRanges(components.map(x => x.range));
   const reference = input.purchasePrice && !grouped.has("purchase-price") ? input.purchasePrice : undefined;
-  if (reference) reasons.push("purchasePrice is an unverified reference; it is not a transaction quote");
+  if (reference) reasons.push("purchasePrice is supplied as the price basis; the remaining all-in components are not fully evidenced");
   const known = !conflict && !missingComponents.length;
   return {
     status: conflict ? "conflict" : known ? "known" : components.length || reference ? "estimate" : "unknown",

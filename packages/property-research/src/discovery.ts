@@ -55,6 +55,7 @@ interface MiniProgramObservationData {
   bedrooms?: number;
   livingRooms?: number;
   purchasePrice?: { minimumCny: number; maximumCny: number };
+  priceKind?: "asking" | "transaction" | "offer" | "tax-assessment";
   status?: "available" | "reserved" | "sold" | "unknown";
   notes?: string;
   evidenceStatus: "claimed";
@@ -106,6 +107,7 @@ const requestSchema = {
           bedrooms: { type: "integer", minimum: 0 },
           livingRooms: { type: "integer", minimum: 0 },
           purchasePrice: { type: "object" },
+          priceKind: { enum: ["asking", "transaction", "offer", "tax-assessment"] },
           status: { enum: ["available", "reserved", "sold", "unknown"] },
           notes: { type: "string", minLength: 1 },
         },
@@ -154,7 +156,7 @@ function candidate(item: ListingItem, source: string, evidence: EvidenceRecord[]
     ...(item.areaSqm === undefined ? {} : { areaSqm: item.areaSqm }),
     ...(item.bedrooms === undefined ? {} : { bedrooms: item.bedrooms }),
     ...(item.livingRooms === undefined ? {} : { livingRooms: item.livingRooms }),
-    ...(item.priceCny ? { purchasePrice: item.priceCny } : {}),
+    ...(item.priceCny ? { askingPrice: item.priceCny } : {}),
     listing: listing(item, source),
     sourceUrls: [item.sourceUrl],
     evidence,
@@ -183,7 +185,8 @@ function enrichCandidate(target: PropertyCandidateInput, data: MiniProgramObserv
     ...(data.areaSqm === undefined ? {} : { areaSqm: data.areaSqm }),
     ...(data.bedrooms === undefined ? {} : { bedrooms: data.bedrooms }),
     ...(data.livingRooms === undefined ? {} : { livingRooms: data.livingRooms }),
-    ...(data.purchasePrice ? { purchasePrice: data.purchasePrice } : {}),
+    ...(data.purchasePrice && data.priceKind && data.priceKind !== "asking" ? { purchasePrice: data.purchasePrice } : {}),
+    ...(data.purchasePrice && (!data.priceKind || data.priceKind === "asking") ? { askingPrice: data.purchasePrice, priceObservations: [{ id: evidence[0]?.id ?? `${target.candidateId}:asking:${data.observedAt}`, kind: "asking" as const, priceCny: data.purchasePrice, source: "wuhan-property-miniprograms", ...(data.sourceUrl ? { sourceUrl: data.sourceUrl } : {}), observedAt: data.observedAt, verification: "claimed" as const, scope: "manual-observation" }] } : {}),
   } satisfies PropertyCandidateInput;
   target.observations = [...(target.observations ?? []), observed];
   for (const [field, value] of Object.entries(observed)) {

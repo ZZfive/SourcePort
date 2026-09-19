@@ -6,7 +6,10 @@ Market, and Wuhan housing-service mini-programs without pretending that their
 authenticated or QR-code flows are public HTTP APIs.
 
 `record-observation` requires a candidate identity, program name, observed time,
-and either a share reference or browser URL. The resulting evidence is marked
-`claimed`, because the adapter records an observation supplied by a person or a
-browser session. Without that provenance it returns a human-verification
-recovery action instead of accepting an untraceable property claim.
+and either a share reference or browser URL. A supplied price defaults to
+`priceKind: "asking"`; callers must explicitly set `transaction`, `offer`, or
+`tax-assessment` before it can be used as a purchase-price basis. The resulting
+evidence is marked `claimed`, because the adapter records an observation
+supplied by a person or a browser session. Without that provenance it returns a
+human-verification recovery action instead of accepting an untraceable property
+claim.

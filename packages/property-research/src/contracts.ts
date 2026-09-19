@@ -21,6 +21,18 @@ export interface PropertyResearchLimits {
 export type PropertyKind = "new" | "resale";
 export type CriterionStatus = "pass" | "fail" | "unknown" | "conflict" | "unsupported";
 export type PropertyEligibility = "eligible" | "needs-verification" | "rejected";
+export type PropertyPriceKind = "asking" | "transaction" | "offer" | "tax-assessment";
+
+export interface PropertyPriceObservation {
+  id: string;
+  kind: PropertyPriceKind;
+  priceCny: MoneyRange;
+  source: string;
+  sourceUrl?: string;
+  observedAt: string;
+  verification?: EvidenceRecord["verification"];
+  scope?: string;
+}
 
 export type PropertyCostComponent =
   | "purchase-price"
@@ -148,7 +160,11 @@ export interface PropertyCandidateInput {
   deliveryDate?: string;
   listing?: PropertyListing;
   listings?: PropertyListing[];
+  /** Current public asking price; never treated as a transaction price. */
+  askingPrice?: MoneyRange;
+  priceObservations?: PropertyPriceObservation[];
   fieldEvidence?: Record<string, string[]>;
+  /** Verified transaction or explicitly documented offer price. */
   purchasePrice?: MoneyRange;
   costEvidence?: PropertyCostEvidence[];
   riskEvidence?: PropertyRiskEvidence[];
@@ -237,6 +253,8 @@ export interface PropertyCandidate {
     deliveryDate?: string;
   };
   listings: PropertyListing[];
+  askingPrice?: MoneyRange;
+  priceObservations: PropertyPriceObservation[];
   purchasePrice?: MoneyRange;
   allInCost: PropertyCostResult;
   financing: FinancingResult;

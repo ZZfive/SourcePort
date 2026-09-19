@@ -40,4 +40,20 @@ describe("property research", () => {
     expect(report.coverage.inputCandidates).toBe(1);
     expect(report.coverage.exclusions).toEqual([{ candidateId: "outside-city", reason: "candidate city '上海' is outside market '示例城市'" }]);
   });
+
+  it("keeps asking price separate from transaction price and total cost", async () => {
+    const report = await researchProperties(brief, {
+      candidates: [{ candidateId: "asking-only", kind: "resale", city: "示例城市", community: "挂牌小区", bedrooms: 3, livingRooms: 1, askingPrice: { minimumCny: 1_300_000, maximumCny: 1_300_000 } }],
+    });
+    const candidate = report.candidates[0]!;
+    expect(candidate.askingPrice).toEqual({ minimumCny: 1_300_000, maximumCny: 1_300_000 });
+    expect(candidate.purchasePrice).toBeUndefined();
+    expect(candidate.allInCost.status).toBe("unknown");
+    expect(candidate.financing.status).toBe("unknown");
+    expect(candidate.criterionResults).toEqual(expect.arrayContaining([
+      expect.objectContaining({ criterion: expect.objectContaining({ key: "budget.asking.maxCny" }), status: "pass" }),
+      expect.objectContaining({ criterion: expect.objectContaining({ key: "budget.allIn.maxCny" }), status: "unknown" }),
+    ]));
+    expect(renderPropertyResearchMarkdown(report)).toContain("挂牌价：1300000–1300000 元（不是成交价）");
+  });
 });

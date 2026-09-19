@@ -15,7 +15,7 @@ export function deduplicatePropertyCandidates(input: readonly PropertyCandidateI
     const existing = groups.get(key);
     if (!existing) {
       const listings = [...(candidate.listing ? [candidate.listing] : []), ...(candidate.listings ?? [])];
-      groups.set(key, { ...candidate, observations: [candidate], ...(listings[0] ? { listing: { ...listings[0] } } : {}), listings, sourceUrls: [...new Set([...(candidate.sourceUrls ?? []), ...listings.map((item) => item.sourceUrl)])] });
+      groups.set(key, { ...candidate, observations: [candidate], priceObservations: [...(candidate.priceObservations ?? [])], ...(listings[0] ? { listing: { ...listings[0] } } : {}), listings, sourceUrls: [...new Set([...(candidate.sourceUrls ?? []), ...listings.map((item) => item.sourceUrl)])] });
       continue;
     }
     const listings = [...(existing.listings ?? (existing.listing ? [existing.listing] : [])), ...(candidate.listing ? [candidate.listing] : []), ...(candidate.listings ?? [])];
@@ -27,6 +27,8 @@ export function deduplicatePropertyCandidates(input: readonly PropertyCandidateI
       listings: [...new Map(listings.map((item) => [item.listingId, item])).values()],
       costEvidence: [...(existing.costEvidence ?? []), ...(candidate.costEvidence ?? [])],
       riskEvidence: [...(existing.riskEvidence ?? []), ...(candidate.riskEvidence ?? [])],
+      ...(existing.askingPrice === undefined && candidate.askingPrice ? { askingPrice: candidate.askingPrice } : {}),
+      priceObservations: [...(existing.priceObservations ?? []), ...(candidate.priceObservations ?? [])],
       evidence: [...new Map(evidence.map((item) => [item.id, item])).values()],
       sourceUrls: [...new Set([...(existing.sourceUrls ?? []), ...(candidate.sourceUrls ?? []), ...listings.map((item) => item.sourceUrl)])],
     });
