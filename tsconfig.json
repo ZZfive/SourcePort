@@ -23,6 +23,9 @@
       "path": "./packages/property-research"
     },
     {
+      "path": "./packages/purchase-coach"
+    },
+    {
       "path": "./packages/cli"
     },
     {

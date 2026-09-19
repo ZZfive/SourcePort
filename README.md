@@ -79,6 +79,7 @@ The repository currently contains:
 | <code>@sourceport/cli</code> | Source discovery, operation execution, doctor, and car-research CLI |
 | <code>@sourceport/car-research</code> | Bounded cross-source car research and deterministic reporting |
 | <code>@sourceport/property-research</code> | Bounded configurable new/resale property research, all-in costs, dual commutes, and verification gaps |
+| <code>@sourceport/purchase-coach</code> | Shared household liquidity assessment and staged car/property decision guardrails |
 | <code>@sourceport/wuhan-housing</code> | Official Wuhan housing, presale, government, and provident-fund page acquisition and diagnosis |
 | <code>@sourceport/property-routes</code> | Public map route-time evidence with mode, departure window, and manual/browser recovery |
 | <code>@sourceport/wuhan-property-miniprograms</code> | Claimed, provenance-preserving observations from Wuhan property mini-programs and browser-assisted flows |
