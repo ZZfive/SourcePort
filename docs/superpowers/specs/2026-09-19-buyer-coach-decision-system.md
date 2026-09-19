@@ -101,14 +101,19 @@ these inputs separate and configurable:
 - monthly net household income and income stability;
 - annual baseline spending, excluding the two purchases;
 - current liquid reserve;
-- wedding, family-support, renovation, and other near-term large expenses;
+- optional wedding, family-support, renovation, and other near-term large
+  expense scenarios;
 - car cash/finance scenarios and property upfront-cost scenarios;
-- a reserve floor expressed as months of baseline spending plus known near-term
-  commitments.
+- a configurable reserve floor expressed as months of baseline spending, with
+  optional known near-term commitments added only when the buyer chooses to
+  model them.
 
 The coach should show the remaining reserve after each purchase combination and
-pause a plan when the combination crosses the reserve floor. It must not treat
-the maximum possible down payment as the recommended down payment.
+flag a plan when the combination crosses the configured reserve floor. It must
+not treat the maximum possible down payment as the recommended down payment,
+and it must not silently convert uncertain future expenses into hard limits.
+The default case assumes the supplied income continues; a separate stress case
+can model temporary income loss or optional large commitments.
 
 ### Phase B: learning and evidence gates
 
