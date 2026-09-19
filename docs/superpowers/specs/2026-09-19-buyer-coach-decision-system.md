@@ -94,6 +94,22 @@ The first financial lesson should derive a safe payment range from household
 cash flow and reserve goals. A provident-fund contribution is one input, not a
 monthly-payment limit by itself.
 
+Because the household may buy a car and a property in the same planning
+window, the coach must calculate one shared liquidity budget. It should keep
+these inputs separate and configurable:
+
+- monthly net household income and income stability;
+- annual baseline spending, excluding the two purchases;
+- current liquid reserve;
+- wedding, family-support, renovation, and other near-term large expenses;
+- car cash/finance scenarios and property upfront-cost scenarios;
+- a reserve floor expressed as months of baseline spending plus known near-term
+  commitments.
+
+The coach should show the remaining reserve after each purchase combination and
+pause a plan when the combination crosses the reserve floor. It must not treat
+the maximum possible down payment as the recommended down payment.
+
 ### Phase B: learning and evidence gates
 
 Create reusable lessons and gates for both domains:
