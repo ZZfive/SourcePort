@@ -96,11 +96,11 @@ describe("car research coverage and exact-trim regressions", () => {
   it("does not display reference-only prices as a verified on-road total", async () => {
     const report = await researchCars(brief(), fixture());
     const md = renderCarResearchMarkdown(report);
-    expect(md).toContain("Vehicle reference (excludes costs)");
-    expect(md).toContain("Verified on-road total");
-    expect(md).toContain("12万 | unknown | vehicle-price, purchase-tax, insurance, registration");
-    expect(md).toContain("银河TT");
-    expect(md).toContain("presentation limit");
+    expect(md).toContain("# 买车研究报告");
+    expect(md).toContain("参考价");
+    expect(md).toContain("落地预算");
+    expect(md).toContain("落地总价均未形成可验证区间");
+    expect(md).not.toContain("## Criterion matrix");
     expect(md).not.toContain("estimate ¥");
   });
   it("promotes purchaseTiming to a real hard condition and keeps missing delivery evidence unknown", async () => {

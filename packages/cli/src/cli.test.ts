@@ -276,8 +276,8 @@ describe("SourcePort CLI", () => {
       });
 
       expect(exitCode).toBe(3);
-      expect(output.stdout.join("")).toContain("# Car Research Report");
-      expect(output.stdout.join("")).toContain("## Coverage limitations");
+      expect(output.stdout.join("")).toContain("# 买车研究报告");
+      expect(output.stdout.join("")).toContain("## 覆盖限制");
       expect(JSON.parse(await readFile(reportFile, "utf8"))).toEqual(expect.objectContaining({ status: "blocked" }));
       expect(output.stderr).toEqual([]);
     } finally {

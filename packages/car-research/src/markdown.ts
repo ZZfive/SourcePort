@@ -1,166 +1,96 @@
 import type { CarCandidate, CarResearchReport } from "./contracts.js";
 
 function cell(value: unknown): string {
-  return String(value ?? "")
-    .replaceAll("|", "\\|")
-    .replace(/\s+/g, " ")
-    .trim();
+  return String(value ?? "").replaceAll("|", "\\|").replace(/\s+/g, " ").trim();
+}
+
+function status(value: string): string {
+  return ({ success: "可用", partial: "部分覆盖", blocked: "受阻", failed: "失败", eligible: "符合已知条件", "needs-verification": "待核验", rejected: "已排除", pass: "通过", fail: "未通过", unknown: "未知", conflict: "冲突", unsupported: "不支持", matched: "已匹配", unmatched: "未匹配" } as Record<string, string>)[value] ?? value;
 }
 
 function money(value: number | undefined): string {
-  return value === undefined ? "unknown" : `¥${Math.round(value).toLocaleString("zh-CN")}`;
+  return value === undefined ? "未核验" : `¥${Math.round(value).toLocaleString("zh-CN")}`;
 }
 
 function onRoad(candidate: CarCandidate): string {
   const range = candidate.onRoadCost.status === "known" ? candidate.onRoadCost.range : undefined;
-  if (!range) {
-    return "unknown";
-  }
-  return `${money(range.minimumCny)}–${money(range.maximumCny)}`;
+  return range ? `${money(range.minimumCny)}–${money(range.maximumCny)}` : "未核验";
 }
 
-function assistanceSummary(candidate: CarCandidate): {
-  claimedLevel: string;
-  capabilities: string;
-  hardware: string;
-  system: string;
-} {
-  const root = candidate.drivingAssistance !== null && typeof candidate.drivingAssistance === "object"
-    ? candidate.drivingAssistance as Record<string, unknown>
-    : {};
-  const claimed = root["claimedAutomationLevel"] as Record<string, unknown> | null | undefined;
-  const capabilities = root["capabilities"] as Record<string, unknown> | undefined;
-  const domains = root["operatingDomains"] as Record<string, unknown> | undefined;
-  const capabilityLines = new Set<string>();
-  const describe = (value: unknown) => {
-    if (Array.isArray(value)) { value.forEach(describe); return; }
-    if (!value || typeof value !== "object") return;
-    const item = value as Record<string, unknown>;
-    if (typeof item["availability"] === "string") {
-      capabilityLines.add(`${cell(item["label"] ?? item["key"])}:${cell(item["availability"])}${item["configPrice"] ? ` (option price ${cell(item["configPrice"])})` : ""}`);
-      describe(item["options"]);
-    } else Object.values(item).forEach(describe);
-  };
-  describe(capabilities);
-  describe(domains);
-  const capabilityText = [...capabilityLines].join(", ");
-  const hardware = root["hardware"] as Record<string, unknown> | undefined;
-  const hardwareText = hardware
-    ? Object.entries(hardware)
-      .filter(([, value]) => value !== null && value !== "")
-      .map(([key, value]) => `${key}=${cell(value)}`)
-      .join(", ")
-    : "";
-  const system = root["system"] as Record<string, unknown> | undefined;
-  return {
-    claimedLevel: cell(claimed?.["value"]) || "unknown",
-    capabilities: capabilityText || "unknown",
-    hardware: hardwareText || "unknown",
-    system: system
-      ? [system["vendor"], system["name"], system["version"]].filter(Boolean).map(cell).join(" ") || "unknown"
-      : "unknown",
-  };
+function candidateName(candidate: CarCandidate): string {
+  return `${candidate.series.brand} ${candidate.series.name}`.trim();
 }
 
+function trimName(candidate: CarCandidate): string {
+  return `${candidate.trim.year} ${candidate.trim.name}`.trim();
+}
+
+function budgetCheck(candidate: CarCandidate): string {
+  const result = candidate.criterionResults.find((item) => item.criterion.key === "budget.onRoad.maxCny");
+  return result ? status(result.status) : "未核验";
+}
+
+function assistanceCheck(candidate: CarCandidate): string {
+  const result = candidate.criterionResults.find((item) => item.criterion.key === "drivingAssistance.capabilities");
+  if (!result) return "未核验";
+  if (!result.details?.length) return status(result.status);
+  if (result.status === "pass") return `${result.details.length}/${result.details.length}项通过`;
+  const failed = result.details.filter((item) => item.status === "fail").map((item) => item.key);
+  const unknown = result.details.filter((item) => item.status === "unknown").map((item) => item.key);
+  return [failed.length ? `未通过：${failed.join("、")}` : "", unknown.length ? `未知：${unknown.join("、")}` : ""].filter(Boolean).join("；") || status(result.status);
+}
+
+function limitationSummary(report: CarResearchReport): string[] {
+  const translate = (value: string): string => {
+    if (value.startsWith("research queried at most")) return "初始种子查询数量受上限约束，未查询的种子仍保留在记录中";
+    if (value.startsWith("discovery uses explicit seeds")) return "发现范围来自明确种子、品牌目录和有限竞品链接，不代表完整市场普查";
+    if (/^\d+ series retained;/.test(value)) return value.replace(/^(\d+) series retained; at most (\d+) admitted and (\d+) scanned$/, "共保留 $1 个车系，最多纳入 $2 个、扫描 $3 个");
+    if (value.startsWith("finalCandidates=")) return "展示候选数量有上限，未展示候选仍保留在 JSON 报告中";
+    if (value.startsWith("ordering uses")) return "排序依据是硬条件、偏好、证据完整度和来源质量，不代表驾驶质量评分";
+    if (value.startsWith("source reference prices")) return "源站参考价不含未经核验的必要费用，不能直接视为落地价";
+    if (value.startsWith("presale, announcement")) return "预售、公告和在售状态不能证明能在目标日期交付";
+    return value;
+  };
+  const limitations = report.coverage.limitations.slice(0, 3).map(translate);
+  if (report.coverage.limitations.length > limitations.length) limitations.push(`另有 ${report.coverage.limitations.length - limitations.length} 项限制，详见 JSON 报告`);
+  return limitations;
+}
+
+/** Concise Chinese report for purchase decisions; full provenance remains in JSON. */
 export function renderCarResearchMarkdown(report: CarResearchReport): string {
+  const scanned = report.discoveredSeries?.filter((item) => item.status === "scanned").length ?? 0;
+  const unresolved = report.discoveredSeries?.filter((item) => item.status !== "scanned").length ?? 0;
   const lines: string[] = [
-    "# Car Research Report",
-    "",
-    `- Status: ${report.status}`,
-    `- Query: ${report.query}`,
-    `- Market: ${report.market.city}`,
-    `- Generated: ${report.generatedAt}`,
-    ...(report.dataAsOf ? [`- Data as of: ${report.dataAsOf}`] : []),
-    ...(report.freshness ? [`- Freshness: ${report.freshness}`] : []),
-    `- Coverage: ${report.coverage.mode}`,
-    "",
-    "## Candidates",
-    "",
-    "Source vehicle prices are references only; unknown mandatory costs are not zero. Candidate order applies only to the inspected evidence, not the whole market.",
-    "",
-    "| Candidate | Eligibility | Exact trim | Body style | Vehicle reference (excludes costs) | Verified on-road total | Missing costs | Cross-source | Evidence |",
-    "|---|---|---|---|---|---|---|---|---:|",
+    "# 买车研究报告", "",
+    `- 研究状态：${status(report.status)}`,
+    `- 市场：${cell(report.market.city)}`,
+    `- 预算口径：${report.decisionContext?.budget?.basis === "on-road" ? "落地总价" : "参考价"}`,
+    `- 生成时间：${report.generatedAt}`, "",
+    "## 先看结论", "",
+    report.candidates.length ? `当前有 ${report.candidates.length} 个候选进入人工核验阶段，不能仅凭本报告直接下单。` : "当前没有通过初筛的候选，需要补充数据后重试。",
+    "源站车型价只是参考价，不代表武汉真实成交价；保险、上牌和其他必要费用未核验时，不按 0 元计算。", "",
+    "## 候选车型", "",
+    "| 车型 | 建议核验配置 | 参考价 | 落地预算 | 辅助驾驶核验 | 跨源匹配 |", "|---|---|---:|---|---|---|",
   ];
-  if (report.candidates.length === 0) {
-    lines.push("| none | | | | | | | | 0 |");
-  } else {
-    for (const candidate of report.candidates) {
-      lines.push(
-        `| ${cell(`${candidate.series.brand} ${candidate.series.name}`)} | ${candidate.eligibility} | ${cell(`${candidate.trim.year} ${candidate.trim.name}`)} | ${cell(candidate.series.bodyStyle ?? "unknown")} | ${cell(candidate.trim.dealerPrice || candidate.trim.ownerPrice || candidate.trim.officialPrice) || "unknown"} | ${onRoad(candidate)} | ${cell(candidate.onRoadCost.missingComponents.join(", ")) || "none"} | ${candidate.crossSource.status} | ${candidate.evidenceIds.length} |`,
-      );
-    }
-  }
-  if (report.discoveredSeries?.length) {
-    lines.push("", "## Discovery ledger", "", "| Series | Origins | State | Reason | Evidence |", "|---|---|---|---|---|");
-    for (const item of report.discoveredSeries) lines.push(`| ${cell(`${item.brand} ${item.name}`)} | ${cell(item.origins.join(", "))} | ${item.status} | ${cell(item.reason)} | ${cell(item.evidenceIds.join(", "))} |`);
-  }
-  if (report.allCandidates?.length) {
-    const displayed = new Set(report.candidates.map((item) => item.candidateId));
-    lines.push("", "## All series representatives (before display limit)", "", "| Series | Exact trim | Eligibility | Configuration | Display |", "|---|---|---|---|---|");
-    for (const item of report.allCandidates) lines.push(`| ${cell(item.series.name)} | ${cell(`${item.trim.year} ${item.trim.name}`)} | ${item.eligibility} | ${item.configurationStatus ?? "unknown"} | ${displayed.has(item.candidateId) ? "shown" : item.eligibility === "rejected" ? "hard condition failed" : "presentation limit"} |`);
-  }
-  lines.push("", "## Criterion matrix", "", "| Candidate | Criterion | Kind | Result | Explanation | Evidence |", "|---|---|---|---|---|---|");
-  for (const candidate of report.evaluatedTrims ?? [...report.candidates, ...report.rejected]) {
-    for (const criterion of candidate.criterionResults) {
-      lines.push(
-        `| ${cell(`${candidate.series.name} ${candidate.trim.year} ${candidate.trim.name}`)} | ${cell(criterion.criterion.label)} | ${criterion.criterion.kind} | ${criterion.status} | ${cell(criterion.message)} | ${cell(criterion.evidenceIds.join(", ")) || "none"} |`,
-      );
-    }
-  }
-  lines.push("", "## Driving-assistance matrix", "", "| Candidate | Claimed level | Capabilities | Hardware | System |", "|---|---|---|---|---|");
+  if (!report.candidates.length) lines.push("| 暂无 | | | | | |");
   for (const candidate of report.candidates) {
-    const assistance = assistanceSummary(candidate);
-    lines.push(
-      `| ${cell(`${candidate.series.name} ${candidate.trim.year} ${candidate.trim.name}`)} | ${assistance.claimedLevel} | ${cell(assistance.capabilities)} | ${cell(assistance.hardware)} | ${cell(assistance.system)} |`,
-    );
+    const price = candidate.trim.dealerPrice || candidate.trim.officialPrice || candidate.series.dealerPrice || candidate.series.officialPrice || "未核验";
+    lines.push(`| ${cell(candidateName(candidate))} | ${cell(trimName(candidate))} | ${cell(price)} | ${budgetCheck(candidate)}（${onRoad(candidate)}） | ${cell(assistanceCheck(candidate))} | ${status(candidate.crossSource.status)} |`);
   }
-  if (report.candidates.some((candidate) => candidate.alternatives?.length)) {
-    lines.push("", "## Unselected exact trims", "", "| Series | Trim | Year | Price | Reason |", "|---|---|---|---|---|");
-    for (const candidate of report.candidates) {
-      for (const alternative of candidate.alternatives ?? []) {
-        lines.push(`| ${cell(candidate.series.name)} | ${cell(alternative.name)} | ${cell(alternative.year)} | ${cell(alternative.price)} | ${cell(alternative.reason)} |`);
-      }
-    }
+  lines.push("", "## 需要先核验", "",
+    `- 真实成交价：当前 ${report.candidates.length} 个候选的落地总价均未形成可验证区间。`,
+    "- 配置价格：确认辅助驾驶是否为该年款、该配置标配，是否需要选装或订阅。",
+    "- 线下信息：向武汉门店索取书面报价单，拆分裸车、保险、上牌、金融服务费和赠品折现。",
+    `- 覆盖范围：已扫描 ${scanned} 个车系，另有 ${unresolved} 个车系未完成或未纳入本轮配置核验。`, "",
+    "## 下一步", "",
+    "- 先对候选车型做武汉本地真实报价核验，再比较最终落地价和试驾体验。",
+    "- 对辅助驾驶重点确认高速领航、自动泊车的实际开通条件和适用范围。",
+  );
+  if (limitationSummary(report).length) {
+    lines.push("", "## 覆盖限制", "");
+    limitationSummary(report).forEach((item) => lines.push(`- ${cell(item)}`));
   }
-  lines.push("", "## Coverage limitations", "");
-  report.coverage.limitations.forEach((limitation) => lines.push(`- ${limitation}`));
-  if (report.marketChanges?.length) {
-    lines.push("", "## Recent market changes", "", "| Series | Change | Summary | Evidence |", "|---|---|---|---|");
-    report.marketChanges.forEach((change) => lines.push(`| ${cell(change.seriesId)} | ${cell(change.kind)} | ${cell(change.summary)} | ${cell(change.evidenceIds.join(", "))} |`));
-  }
-  if (report.feedbackClusters?.length) {
-    lines.push("", "## User feedback and complaints", "", "| Series | Topic | Signal | Years | Trims | Sources | Trend | Rationale | Evidence |", "|---|---|---|---|---|---|---|---|---|");
-    report.feedbackClusters.forEach((cluster) => lines.push(`| ${cell(cluster.series)} | ${cell(cluster.topic)} | ${cell(cluster.signal)} | ${cell((cluster.modelYears ?? []).join(", "))} | ${cell((cluster.trimIds ?? []).join(", "))} | ${cell(String(cluster.sourceCount ?? ""))} | ${cell([cluster.firstSeenAt, cluster.lastSeenAt].filter(Boolean).join(" -> "))} | ${cell(cluster.rationale)} | ${cell(cluster.evidenceIds.join(", "))} |`));
-  }
-  if (report.recommendation) {
-    lines.push("## Recommendation");
-    lines.push(`- Status: ${cell(report.recommendation.status)}`);
-    lines.push(`- Rationale: ${cell(report.recommendation.rationale)}`);
-    lines.push(`- Evidence: ${cell(report.recommendation.evidenceIds.join(", "))}`);
-  }
-  if (report.actionItems?.length) {
-    lines.push("", "## Before-buy actions", "");
-    report.actionItems.forEach((item) => lines.push(`- ${cell(item)}`));
-  }
-  if (report.unsupportedCriteria.length > 0) {
-    lines.push("", "## Unsupported criteria", "");
-    report.unsupportedCriteria.forEach((criterion) =>
-      lines.push(`- ${criterion.key}: ${criterion.label}`));
-  }
-  if (report.warnings.length > 0) {
-    lines.push("", "## Warnings", "");
-    report.warnings.forEach((warning) => lines.push(`- ${warning.code}: ${warning.message}`));
-  }
-  if (report.recoveryActions.length > 0) {
-    lines.push("", "## Recovery actions", "");
-    report.recoveryActions.forEach((action) =>
-      lines.push(`- ${action.kind}: ${action.description}`));
-  }
-  lines.push("", "## Evidence", "");
-  for (const evidence of report.evidence) {
-    lines.push(
-      `- ${evidence.id}: ${evidence.source}.${evidence.operation} via ${evidence.backend}, ${evidence.retrievedAt}${evidence.sourceUrl ? `, ${evidence.sourceUrl}` : ""}`,
-    );
-  }
+  if (report.warnings.length) lines.push("", "## 数据提醒", "", `- 本轮有 ${report.warnings.length} 条数据提醒；机器可读详情和证据链保留在 JSON 报告中。`);
+  lines.push("", "## 证据", "", `- 已保留 ${report.evidence.length} 条证据记录；完整来源、URL、时间和证据片段请查看 JSON 报告。`);
   return `${lines.join("\n")}\n`;
 }
