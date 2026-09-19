@@ -12,6 +12,12 @@ function positive(value: number | undefined, field: string): number | undefined 
   return value;
 }
 
+function months(value: number | undefined, field: string): number {
+  if (value === undefined) return 0;
+  if (!Number.isInteger(value) || value < 0) throw new Error(`${field} must be a non-negative integer`);
+  return value;
+}
+
 export function assessHouseholdLiquidity(
   finance: HouseholdFinanceInput,
   scenario: PurchaseCashScenario = {},
@@ -23,8 +29,26 @@ export function assessHouseholdLiquidity(
   const plannedCommitments = nonNegative(finance.plannedCommitmentsCny, "plannedCommitmentsCny");
   const monthlyFreeCashFlowCny = monthlyIncome - annualSpend / 12;
   const annualFreeCashFlowCny = monthlyFreeCashFlowCny * 12;
-  const plannedCashOutlayCny = nonNegative(scenario.carCashCny, "carCashCny") + nonNegative(scenario.propertyUpfrontCny, "propertyUpfrontCny");
-  const remainingReserveCny = liquidReserve - plannedCashOutlayCny;
+  const carCashCny = nonNegative(scenario.carCashCny, "carCashCny");
+  const propertyUpfrontCny = nonNegative(scenario.propertyUpfrontCny, "propertyUpfrontCny");
+  const carPurchaseAfterMonths = months(scenario.carPurchaseAfterMonths, "carPurchaseAfterMonths");
+  const propertyPurchaseAfterMonths = months(scenario.propertyPurchaseAfterMonths, "propertyPurchaseAfterMonths");
+  const events = [
+    { month: carPurchaseAfterMonths, outlay: carCashCny, label: "car" },
+    { month: propertyPurchaseAfterMonths, outlay: propertyUpfrontCny, label: "property" },
+  ].filter((event) => event.outlay > 0).sort((a, b) => a.month - b.month);
+  let balance = liquidReserve;
+  let previousMonth = 0;
+  let minimumReserveCny = balance;
+  for (const event of events) {
+    balance += monthlyFreeCashFlowCny * (event.month - previousMonth);
+    balance -= event.outlay;
+    minimumReserveCny = Math.min(minimumReserveCny, balance);
+    previousMonth = event.month;
+  }
+  const savingsBeforePurchasesCny = monthlyFreeCashFlowCny * (events.length ? events[0]!.month : 0);
+  const plannedCashOutlayCny = carCashCny + propertyUpfrontCny;
+  const remainingReserveCny = balance;
   const reserveMonths = positive(finance.reserveMonths, "reserveMonths");
   const reserveFloorCny = reserveMonths === undefined ? undefined : annualSpend / 12 * reserveMonths + plannedCommitments;
   const combinedMonthlyPaymentCny = nonNegative(scenario.carMonthlyPaymentCny, "carMonthlyPaymentCny") + nonNegative(scenario.propertyMonthlyPaymentCny, "propertyMonthlyPaymentCny");
@@ -33,7 +57,7 @@ export function assessHouseholdLiquidity(
   const reasons: string[] = [];
   if (monthlyFreeCashFlowCny < 0) reasons.push("baseline spending exceeds monthly net income");
   if (reserveFloorCny === undefined) reasons.push("reserve floor is missing; liquidity safety cannot be judged");
-  else if (remainingReserveCny < reserveFloorCny) reasons.push("planned cash outlay would reduce liquid reserve below the configured floor");
+  else if (minimumReserveCny < reserveFloorCny) reasons.push("the purchase sequence would reduce liquid reserve below the configured floor");
   else reasons.push("planned cash outlay stays above the configured reserve floor");
   if (paymentCap === undefined) reasons.push("combined monthly-payment cap is missing; payment safety is not judged");
   else if (paymentHeadroomCny! < 0) reasons.push("combined monthly payments exceed the configured cap");
@@ -47,7 +71,9 @@ export function assessHouseholdLiquidity(
     monthlyFreeCashFlowCny,
     annualFreeCashFlowCny,
     plannedCashOutlayCny,
+    savingsBeforePurchasesCny,
     remainingReserveCny,
+    minimumReserveCny,
     ...(reserveFloorCny === undefined ? {} : { reserveFloorCny }),
     combinedMonthlyPaymentCny,
     ...(paymentHeadroomCny === undefined ? {} : { paymentHeadroomCny }),

@@ -496,6 +496,18 @@ It can also include `wuhan-property-miniprograms:record-observation` requests.
 These enrich an existing candidate only when a share reference or browser URL is
 present, and remain `claimed` until an official source verifies the property.
 
+The shared buyer-coach package can compare car and property purchase timing with
+ongoing income and savings. Keep the values in a private runtime input:
+
+~~~bash
+sourceport purchase-liquidity --input-file private/buyer-coach/liquidity.local.json --format md
+~~~
+
+The input contains `finance` and `scenario`. Scenario fields can include
+`carPurchaseAfterMonths` and `propertyPurchaseAfterMonths`, so savings earned
+between two purchases are included. A missing reserve floor keeps the result
+`unknown` rather than claiming that a plan is safe.
+
 Inline JSON is also supported:
 
 ~~~bash

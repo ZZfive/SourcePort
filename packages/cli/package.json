@@ -13,6 +13,7 @@
     "@sourceport/brave-search": "*",
     "@sourceport/car-research": "*",
     "@sourceport/property-research": "*",
+    "@sourceport/purchase-coach": "*",
     "@sourceport/core": "*",
     "@sourceport/decision-context": "*",
     "@sourceport/dongchedi": "*",

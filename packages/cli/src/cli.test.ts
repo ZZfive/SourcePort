@@ -453,4 +453,15 @@ describe("SourcePort CLI", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it("runs the shared purchase-liquidity assessment from runtime input", async () => {
+    const output = capture();
+    const exitCode = await runCli(["purchase-liquidity", "--input", JSON.stringify({
+      finance: { monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 18 },
+      scenario: { carCashCny: 150_000, propertyUpfrontCny: 800_000, carPurchaseAfterMonths: 0, propertyPurchaseAfterMonths: 12 },
+    }), "--format", "md"], { ...output.io });
+    expect(exitCode).toBe(0);
+    expect(output.stdout.join("")).toContain("购买序列后的现金储备：290000 元");
+    expect(output.stderr).toEqual([]);
+  });
 });

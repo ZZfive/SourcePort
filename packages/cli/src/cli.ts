@@ -60,6 +60,7 @@ import { WuhanHousingAdapter } from "@sourceport/wuhan-housing";
 import { WuhanListingsAdapter } from "@sourceport/wuhan-listings";
 import { PropertyRoutesAdapter } from "@sourceport/property-routes";
 import { WuhanPropertyMiniProgramsAdapter } from "@sourceport/wuhan-property-miniprograms";
+import { assessHouseholdLiquidity, type LiquidityAssessment } from "@sourceport/purchase-coach";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
@@ -96,6 +97,22 @@ function researchExitCode(report: CarResearchReport): number {
 
 function propertyResearchExitCode(report: PropertyResearchReport): number {
   return report.status === "success" ? 0 : 1;
+}
+
+function renderLiquidityMarkdown(result: LiquidityAssessment): string {
+  return [
+    "# 家庭车房流动性评估",
+    "",
+    `- 月度结余：${result.monthlyFreeCashFlowCny} 元`,
+    `- 购买前累计新增储蓄：${result.savingsBeforePurchasesCny} 元`,
+    `- 计划现金支出：${result.plannedCashOutlayCny} 元`,
+    `- 购买序列后的现金储备：${result.remainingReserveCny} 元`,
+    `- 过程最低现金储备：${result.minimumReserveCny} 元`,
+    `- 合计月供：${result.combinedMonthlyPaymentCny} 元`,
+    `- 状态：${result.status}`,
+    `- 判断：${result.reasons.join("；")}`,
+    "",
+  ].join("\n");
 }
 
 function contextExitCode(result: DecisionEvidenceCorpus | DecisionContextReport): number {
@@ -277,6 +294,38 @@ export async function runCli(
       }
       writeJson(stderr, cliError("invalid_cli_input", "market supports snapshot, refresh, diff, timeline, feedback, feedback-snapshot, feedback-refresh and feedback-diff"));
       return 2;
+    }
+
+    if (command === "purchase-liquidity") {
+      const parsed = parseArgs({
+        args: [...argv.slice(1)],
+        allowPositionals: false,
+        strict: true,
+        options: { input: { type: "string" }, "input-file": { type: "string" }, format: { type: "string", default: "json" } },
+      });
+      const inlineInput = parsed.values.input;
+      const inputFile = parsed.values["input-file"];
+      if ((inlineInput === undefined) === (inputFile === undefined)) {
+        writeJson(stderr, cliError("invalid_cli_input", "purchase-liquidity requires exactly one of --input or --input-file"));
+        return 2;
+      }
+      const format = parsed.values.format;
+      if (format !== "json" && format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "--format must be json or md"));
+        return 2;
+      }
+      try {
+        const value = JSON.parse(inlineInput ?? await readFile(inputFile!, "utf8")) as Record<string, unknown>;
+        const finance = value["finance"] as Parameters<typeof assessHouseholdLiquidity>[0];
+        const scenario = value["scenario"] as Parameters<typeof assessHouseholdLiquidity>[1];
+        const result = assessHouseholdLiquidity(finance, scenario);
+        if (format === "md") stdout(renderLiquidityMarkdown(result));
+        else writeJson(stdout, result);
+        return 0;
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", error instanceof Error ? error.message : "invalid purchase-liquidity input"));
+        return 2;
+      }
     }
 
     if (command === "research-cars") {
@@ -799,7 +848,7 @@ export async function runCli(
       stderr,
       cliError(
         "invalid_cli_input",
-        "expected sources, capabilities, run, doctor, research-cars, research-property, property-discover, property snapshot|timeline|feedback, car-context collect, or context collect|compile command",
+        "expected sources, capabilities, run, doctor, research-cars, purchase-liquidity, research-property, property-discover, property snapshot|timeline|feedback, car-context collect, or context collect|compile command",
       ),
     );
     return 2;

@@ -10,6 +10,9 @@ export interface HouseholdFinanceInput {
 export interface PurchaseCashScenario {
   carCashCny?: number;
   propertyUpfrontCny?: number;
+  /** Months from today until each purchase; omitted means purchase now. */
+  carPurchaseAfterMonths?: number;
+  propertyPurchaseAfterMonths?: number;
   carMonthlyPaymentCny?: number;
   propertyMonthlyPaymentCny?: number;
   combinedMonthlyPaymentCapCny?: number;
@@ -21,7 +24,9 @@ export interface LiquidityAssessment {
   monthlyFreeCashFlowCny: number;
   annualFreeCashFlowCny: number;
   plannedCashOutlayCny: number;
+  savingsBeforePurchasesCny: number;
   remainingReserveCny: number;
+  minimumReserveCny: number;
   reserveFloorCny?: number;
   combinedMonthlyPaymentCny: number;
   paymentHeadroomCny?: number;

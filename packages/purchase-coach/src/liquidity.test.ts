@@ -21,6 +21,14 @@ describe("household liquidity assessment", () => {
   it("flags a scenario that consumes the reserve floor", () => {
     const result = assessHouseholdLiquidity({ monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 24 }, { propertyUpfrontCny: 800_000, carCashCny: 200_000 });
     expect(result.status).toBe("below-floor");
-    expect(result.reasons).toContain("planned cash outlay would reduce liquid reserve below the configured floor");
+    expect(result.reasons).toContain("the purchase sequence would reduce liquid reserve below the configured floor");
+  });
+
+  it("includes savings accumulated before a later purchase", () => {
+    const result = assessHouseholdLiquidity({ monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 18 }, { carCashCny: 150_000, propertyUpfrontCny: 800_000, carPurchaseAfterMonths: 0, propertyPurchaseAfterMonths: 12 });
+    expect(result.savingsBeforePurchasesCny).toBe(0);
+    expect(result.remainingReserveCny).toBe(290_000);
+    expect(result.minimumReserveCny).toBe(290_000);
+    expect(result.status).toBe("within-floor");
   });
 });
