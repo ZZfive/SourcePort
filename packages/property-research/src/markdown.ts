@@ -8,6 +8,8 @@ export function renderPropertyResearchMarkdown(report: PropertyResearchReport): 
     lines.push(`- 资格：${candidate.eligibility}`);
     lines.push(`- 户型：${candidate.attributes.bedrooms ?? "未知"}室${candidate.attributes.livingRooms ?? "未知"}厅`);
     if (candidate.askingPrice) lines.push(`- 挂牌价：${candidate.askingPrice.minimumCny}–${candidate.askingPrice.maximumCny} 元（不是成交价）`);
+    const nonAskingObservations = candidate.priceObservations.filter((item) => item.kind !== "asking");
+    if (nonAskingObservations.length) lines.push(`- 价格观察：${nonAskingObservations.map((item) => `${item.kind} ${item.priceCny.minimumCny}–${item.priceCny.maximumCny} 元（${item.verification ?? "unknown"}，${item.source}）`).join("；")}`);
     lines.push(`- ${candidate.allInCost.status === "known" ? "总包" : candidate.allInCost.status === "estimate" ? "总包估算" : "总包"}：${price ? `${price.minimumCny}–${price.maximumCny} 元` : "未知"}`);
     lines.push(`- 已核验费用证据下限：${candidate.allInCost.verifiedLowerBoundCny} 元；缺项：${candidate.allInCost.missingComponents.join("、") || "无"}`);
     lines.push(`- 月供情景：${candidate.financing.scenarios.length ? `${Math.min(...candidate.financing.scenarios.map((item) => item.monthlyPaymentCny))}–${Math.max(...candidate.financing.scenarios.map((item) => item.monthlyPaymentCny))} 元/月` : "未知"}`);

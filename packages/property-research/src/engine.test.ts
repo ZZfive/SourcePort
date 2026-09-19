@@ -56,4 +56,11 @@ describe("property research", () => {
     ]));
     expect(renderPropertyResearchMarkdown(report)).toContain("挂牌价：1300000–1300000 元（不是成交价）");
   });
+
+  it("renders claimed transaction observations separately from asking price", async () => {
+    const report = await researchProperties(brief, {
+      candidates: [{ candidateId: "transaction-observed", kind: "resale", city: "示例城市", community: "成交观察小区", bedrooms: 3, livingRooms: 1, purchasePrice: { minimumCny: 1_450_000, maximumCny: 1_450_000 }, priceObservations: [{ id: "tx-1", kind: "transaction", priceCny: { minimumCny: 1_450_000, maximumCny: 1_450_000 }, source: "manual", observedAt: "2026-09-18T00:00:00Z", verification: "claimed" }] }],
+    });
+    expect(renderPropertyResearchMarkdown(report)).toContain("价格观察：transaction 1450000–1450000 元（claimed，manual）");
+  });
 });

@@ -173,6 +173,19 @@ function resultData(result: SourceResult): ListingSearchData | RouteEvidenceData
 }
 
 function enrichCandidate(target: PropertyCandidateInput, data: MiniProgramObservationData, evidence: EvidenceRecord[]): void {
+  const priceKind = data.priceKind ?? "asking";
+  const priceObservation = data.purchasePrice
+    ? {
+        id: evidence[0]?.id ?? `${target.candidateId}:${priceKind}:${data.observedAt}`,
+        kind: priceKind,
+        priceCny: data.purchasePrice,
+        source: "wuhan-property-miniprograms",
+        ...(data.sourceUrl ? { sourceUrl: data.sourceUrl } : {}),
+        observedAt: data.observedAt,
+        verification: "claimed" as const,
+        scope: "manual-observation" as const,
+      }
+    : undefined;
   const observed = {
     candidateId: target.candidateId,
     kind: data.kind,
@@ -185,8 +198,9 @@ function enrichCandidate(target: PropertyCandidateInput, data: MiniProgramObserv
     ...(data.areaSqm === undefined ? {} : { areaSqm: data.areaSqm }),
     ...(data.bedrooms === undefined ? {} : { bedrooms: data.bedrooms }),
     ...(data.livingRooms === undefined ? {} : { livingRooms: data.livingRooms }),
-    ...(data.purchasePrice && data.priceKind && data.priceKind !== "asking" ? { purchasePrice: data.purchasePrice } : {}),
-    ...(data.purchasePrice && (!data.priceKind || data.priceKind === "asking") ? { askingPrice: data.purchasePrice, priceObservations: [{ id: evidence[0]?.id ?? `${target.candidateId}:asking:${data.observedAt}`, kind: "asking" as const, priceCny: data.purchasePrice, source: "wuhan-property-miniprograms", ...(data.sourceUrl ? { sourceUrl: data.sourceUrl } : {}), observedAt: data.observedAt, verification: "claimed" as const, scope: "manual-observation" }] } : {}),
+    ...(data.purchasePrice && priceKind !== "asking" ? { purchasePrice: data.purchasePrice } : {}),
+    ...(data.purchasePrice && priceKind === "asking" ? { askingPrice: data.purchasePrice } : {}),
+    ...(priceObservation ? { priceObservations: [priceObservation] } : {}),
   } satisfies PropertyCandidateInput;
   target.observations = [...(target.observations ?? []), observed];
   for (const [field, value] of Object.entries(observed)) {
