@@ -78,7 +78,7 @@ const requestSchema = {
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["url"],
+        required: [],
         properties: {
           url: { type: "string", minLength: 1 },
           query: { type: "string", minLength: 1 },
@@ -120,10 +120,10 @@ export function validatePropertyDiscoveryRequests(input: unknown): ValidationRes
   const issues: Array<{ path: string; message: string }> = [];
   result.value.forEach((request, index) => {
     const required = request.operation === "search-listings"
-      ? ["query", "kind", "city"]
+      ? ["url", "query", "kind", "city"]
       : request.operation === "record-observation"
         ? ["candidateId", "program", "channel", "city", "kind", "community", "observedAt"]
-        : ["candidateId", "anchorId", "origin", "destination", "mode"];
+        : ["url", "candidateId", "anchorId", "origin", "destination", "mode"];
     for (const field of required) {
       const value = request.parameters[field];
       if (typeof value !== "string" || !value.trim()) issues.push({ path: `${index}.parameters.${field}`, message: `must provide ${field} for ${request.operation}` });

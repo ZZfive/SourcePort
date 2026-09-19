@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { discoverPropertyCandidates } from "./discovery.js";
+import { discoverPropertyCandidates, validatePropertyDiscoveryRequests } from "./discovery.js";
 
 describe("property discovery route enrichment", () => {
+  it("allows a mini-program observation to use a share reference without a web URL", () => {
+    expect(validatePropertyDiscoveryRequests([{ source: "wuhan-property-miniprograms", operation: "record-observation", parameters: { candidateId: "candidate-1", program: "wufang-service", channel: "wechat-mini-program", city: "示例城市", kind: "resale", community: "示例小区", observedAt: "2026-09-19T00:00:00Z", shareRef: "wechat://example" } }]).ok).toBe(true);
+  });
+
   it("attaches route evidence to the candidate discovered earlier in the request list", async () => {
     const result = await discoverPropertyCandidates([
       { source: "listings", operation: "search-listings", parameters: { url: "https://listing.example/search", query: "示例区域", kind: "new", city: "示例城市" } },
