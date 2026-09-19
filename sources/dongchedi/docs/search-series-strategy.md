@@ -22,6 +22,12 @@ Verified: 2026-07-18 (Asia/Shanghai)
 5. Both runs returned series `5273` (宝马X5), current price text, a Wuhan search
    evidence URL, and explicit diagnostics showing the public backend blocked by
    `auth_required` before the browser backend succeeded.
+6. On 2026-09-19, the logged-in browser search page used the `currTab=6` find-car
+   view. Its client-side `/motor/searchapi/search_content_pc/` response returned
+   stable `series_id`, `series_name`, brand and official/dealer reference prices
+   (for example, 秦L DM `9796`). The browser backend now reads that response when
+   available and also accepts the equivalent `cell_type=100` SSR shape. This is
+   still a source reference price, not proof of a local transaction price.
 
 ## Selected backend order
 

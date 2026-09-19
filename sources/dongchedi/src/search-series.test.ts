@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyDongchediSearchPage,
+  parseDongchediSearchApiResponse,
   parseDongchediSearchPage,
 } from "./search-series.js";
 
@@ -42,6 +43,58 @@ const validHtml = `<!doctype html><html><body>
 })}</script></body></html>`;
 
 describe("Dongchedi search-series parsing", () => {
+  it("parses the current authenticated SSR shape for the find-car tab", () => {
+    const data = parseDongchediSearchPage(`<script id="__NEXT_DATA__">${JSON.stringify({
+      props: { pageProps: { searchData: {
+        return_count: 1,
+        data: [{
+          cell_type: 100,
+          series_id: 9796,
+          series_name: "秦L DM",
+          brand_name: "比亚迪",
+          official_price: "9.68-12.68万",
+          agent_price: "8.98-11.98万",
+        }],
+      } } },
+    })}</script>`, 5);
+
+    expect(data.items[0]).toEqual(expect.objectContaining({
+      seriesId: "9796",
+      name: "秦L DM",
+      brand: "比亚迪",
+      officialPrice: "9.68-12.68万",
+      dealerPrice: "8.98-11.98万",
+    }));
+  });
+
+  it("parses authenticated client-side search API rows", () => {
+    const result = parseDongchediSearchApiResponse({
+      return_count: 1,
+      data: [{
+        cell_type: 100,
+        series_id: 9796,
+        series_name: "秦L DM",
+        brand_name: "比亚迪",
+        official_price: "9.68-12.68万",
+        agent_price: "8.98-11.98万",
+      }],
+    }, 5);
+
+    expect(result).toEqual({
+      total: 1,
+      items: [{
+        rank: 1,
+        seriesId: "9796",
+        name: "秦L DM",
+        brand: "比亚迪",
+        officialPrice: "9.68-12.68万",
+        dealerPrice: "8.98-11.98万",
+        pictureCount: null,
+        sourceUrl: "https://www.dongchedi.com/auto/series/9796",
+      }],
+    });
+  });
+
   it("parses only stable car-series rows and preserves source price text", () => {
     const data = parseDongchediSearchPage(validHtml, 1);
 

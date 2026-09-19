@@ -41,10 +41,31 @@ interface SearchDisplay {
 interface SearchItem {
   cell_type?: unknown;
   series_id?: unknown;
+  series_name?: unknown;
+  brand_name?: unknown;
+  sub_brand_name?: unknown;
+  official_price?: unknown;
+  agent_price?: unknown;
+  open_url?: unknown;
   display?: SearchDisplay;
 }
 
 interface SearchData {
+  data?: unknown;
+  return_count?: unknown;
+}
+
+interface SearchApiRow {
+  series_id?: unknown;
+  series_name?: unknown;
+  brand_name?: unknown;
+  sub_brand_name?: unknown;
+  official_price?: unknown;
+  agent_price?: unknown;
+  open_url?: unknown;
+}
+
+interface SearchApiResponse {
   data?: unknown;
   return_count?: unknown;
 }
@@ -63,6 +84,55 @@ export interface DongchediSeriesSearchItem {
 export interface DongchediSeriesSearchData {
   total: number;
   items: DongchediSeriesSearchItem[];
+}
+
+function parseSeriesRows(rows: unknown[], totalValue: unknown, limit: number): DongchediSeriesSearchData {
+  const items: DongchediSeriesSearchItem[] = [];
+  for (const [index, rawItem] of rows.entries()) {
+    const item = rawItem as SearchApiRow;
+    if (!item || typeof item !== "object" || item.series_id === undefined) {
+      continue;
+    }
+    const seriesId = stableId(item.series_id, `Dongchedi search API row ${index + 1}`);
+    const name = requiredText(item.series_name, `Dongchedi search API row ${index + 1} name`);
+    const openUrl = clean(item.open_url);
+    items.push({
+      rank: items.length + 1,
+      seriesId,
+      name,
+      brand: clean(item.brand_name) || clean(item.sub_brand_name),
+      officialPrice: clean(item.official_price),
+      dealerPrice: clean(item.agent_price),
+      pictureCount: null,
+      sourceUrl: /^https?:\/\//i.test(openUrl)
+        ? openUrl
+        : `${DONGCHEDI_BASE}/auto/series/${seriesId}`,
+    });
+    if (items.length >= limit) {
+      break;
+    }
+  }
+
+  const total = Number(totalValue);
+  return {
+    total: Number.isFinite(total) ? total : items.length,
+    items,
+  };
+}
+
+/** Parse the authenticated client-side search API response. */
+export function parseDongchediSearchApiResponse(
+  payload: unknown,
+  limit: number,
+): DongchediSeriesSearchData {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Dongchedi search API response was not an object");
+  }
+  const response = payload as SearchApiResponse;
+  if (!Array.isArray(response.data)) {
+    throw new Error("Dongchedi search API response data was not an array");
+  }
+  return parseSeriesRows(response.data, response.return_count, limit);
 }
 
 function clean(value: unknown): string {
@@ -182,36 +252,35 @@ export function parseDongchediSearchPage(
     throw new Error("Dongchedi searchData.data was not an array");
   }
 
-  const items: DongchediSeriesSearchItem[] = [];
-  for (const [index, rawItem] of searchData.data.entries()) {
-    const item = rawItem as SearchItem;
-    if (item?.cell_type !== SERIES_CELL_TYPE) {
-      continue;
-    }
-    const seriesId = stableId(item.series_id, `Dongchedi search row ${index + 1}`);
-    const display = item.display ?? {};
-    const pictureValue = Number(display.picture_num);
-    items.push({
-      rank: items.length + 1,
-      seriesId,
-      name: requiredText(
-        clean(display.series_name) || clean(display.title),
-        `Dongchedi search row ${index + 1} name`,
-      ),
-      brand: clean(display.sub_brand_name),
-      officialPrice: clean(display.official_price),
-      dealerPrice: clean(display.agent_price),
-      pictureCount: Number.isFinite(pictureValue) ? pictureValue : null,
-      sourceUrl: `${DONGCHEDI_BASE}/auto/series/${seriesId}`,
+  const rows = searchData.data
+    .filter((rawItem) => {
+      const item = rawItem as SearchItem;
+      return item?.cell_type === SERIES_CELL_TYPE ||
+        (item?.cell_type === 100 && item.series_id !== undefined && item.series_name !== undefined);
+    })
+    .map((rawItem) => {
+      const item = rawItem as SearchItem;
+      const display = item.display ?? {};
+      return {
+        series_id: item.series_id,
+        series_name: clean(item.series_name) || clean(display.series_name) || clean(display.title),
+        brand_name: clean(item.brand_name),
+        sub_brand_name: item.cell_type === 100 ? item.sub_brand_name : display.sub_brand_name,
+        official_price: clean(item.official_price) || display.official_price,
+        agent_price: clean(item.agent_price) || display.agent_price,
+        open_url: item.open_url,
+        picture_num: display.picture_num,
+      };
     });
-    if (items.length >= limit) {
-      break;
-    }
-  }
-
-  const totalValue = Number(searchData.return_count);
+  const result = parseSeriesRows(rows, searchData.return_count, limit);
+  const sourceItems = rows.slice(0, result.items.length);
   return {
-    total: Number.isFinite(totalValue) ? totalValue : items.length,
-    items,
+    ...result,
+    items: result.items.map((item, index) => ({
+      ...item,
+      pictureCount: Number.isFinite(Number(sourceItems[index]?.picture_num))
+        ? Number(sourceItems[index]?.picture_num)
+        : null,
+    })),
   };
 }

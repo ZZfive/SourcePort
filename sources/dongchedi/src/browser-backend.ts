@@ -14,6 +14,7 @@ import {
 
 import {
   classifyDongchediSearchPage,
+  parseDongchediSearchApiResponse,
   parseDongchediSearchPage,
 } from "./search-series.js";
 import {
@@ -38,6 +39,13 @@ interface ProcessResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+}
+
+interface BrowserState {
+  url?: unknown;
+  nextData?: unknown;
+  bodyText?: unknown;
+  apiData?: unknown;
 }
 
 export type OpenCliProcessRunner = (
@@ -203,13 +211,15 @@ export class DongchediBrowserBackend implements Backend {
           );
         }
 
+        const stateExpression = route.stateExpression ??
+          `JSON.stringify({url:location.href,title:document.title,nextData:document.querySelector('script#__NEXT_DATA__')?.textContent??null,bodyText:(document.body?.innerText??'').slice(0,2000)})`;
         const browserState = await this.#run(
           this.#command,
           [
             "browser",
             this.#session,
             "eval",
-            `JSON.stringify({url:location.href,title:document.title,nextData:document.querySelector('script#__NEXT_DATA__')?.textContent??null,bodyText:(document.body?.innerText??'').slice(0,2000)})`,
+            stateExpression,
           ],
           context.signal,
         );
@@ -220,21 +230,13 @@ export class DongchediBrowserBackend implements Backend {
             `OpenCLI browser eval failed: ${`${browserState.stderr}\n${browserState.stdout}`.trim().slice(0, 500)}`,
           );
         }
-        state = JSON.parse(browserState.stdout) as {
-          url?: unknown;
-          nextData?: unknown;
-          bodyText?: unknown;
-        };
+        state = JSON.parse(browserState.stdout) as BrowserState;
       }
-      const resolvedState = state as {
-        url?: unknown;
-        nextData?: unknown;
-        bodyText?: unknown;
-      };
+      const resolvedState = state as BrowserState;
       const html = resolvedState.nextData
         ? `<script id="__NEXT_DATA__">${String(resolvedState.nextData)}</script>`
         : String(resolvedState.bodyText ?? "");
-      const classification = route.classify(html);
+      const classification = resolvedState.apiData === undefined ? route.classify(html) : undefined;
       if (classification) {
         return failed(
           context,
@@ -248,12 +250,14 @@ export class DongchediBrowserBackend implements Backend {
       }
       let data: unknown;
       try {
-        data = route.parse(html);
+        data = route.parseState && resolvedState.apiData !== undefined
+          ? route.parseState(resolvedState)
+          : route.parse(html);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Dongchedi parser failed";
         return failed(
           context,
-          /no owner reviews|no car-series rows|no matching trims/i.test(message)
+          /no owner reviews|no car-series rows|no matching trims|search API exposed no car-series rows/i.test(message)
             ? "empty_source_result"
             : "source_drift",
           message,
@@ -322,18 +326,28 @@ export class DongchediBrowserBackend implements Backend {
   #route(context: BackendExecutionContext): {
     requestedUrl: string;
     preferInPageFetch?: boolean;
+    stateExpression?: string;
     classify(html: string): ReturnType<typeof classifyDongchediSearchPage>;
     parse(html: string): unknown;
+    parseState?(state: BrowserState): unknown;
   } | undefined {
     if (context.request.operation === "search-series") {
       const parameters = context.request.parameters as { keyword: string; limit?: number };
       return {
-        requestedUrl: `https://www.dongchedi.com/search?keyword=${encodeURIComponent(parameters.keyword)}`,
+        requestedUrl: `https://www.dongchedi.com/search?keyword=${encodeURIComponent(parameters.keyword)}&currTab=6`,
+        stateExpression: `(async()=>{const next=()=>document.querySelector('script#__NEXT_DATA__')?.textContent??null;const hasSeries=(text)=>{try{return (JSON.parse(text)?.props?.pageProps?.searchData?.data??[]).some((item)=>item?.cell_type===100&&item?.series_id);}catch{return false;}};const initial=next();if(hasSeries(initial))return JSON.stringify({url:location.href,nextData:initial,bodyText:(document.body?.innerText??'').slice(0,2000)});let target;for(let i=0;i<12&&!target;i+=1){target=performance.getEntriesByType('resource').map((entry)=>entry.name).filter((name)=>name.includes('/motor/searchapi/search_content_pc/')).slice(-1)[0];if(!target)await new Promise((resolve)=>setTimeout(resolve,500));}if(!target)return JSON.stringify({url:location.href,nextData:next(),bodyText:(document.body?.innerText??'').slice(0,2000)});const response=await fetch(target,{credentials:'include'});const text=await response.text();let apiData;try{apiData=JSON.parse(text);}catch{}return JSON.stringify({url:response.url||target,apiData,nextData:next(),bodyText:(document.body?.innerText??'').slice(0,2000)});})()`,
         classify: classifyDongchediSearchPage,
         parse: (html) => {
           const data = parseDongchediSearchPage(html, parameters.limit ?? 15);
           if (data.items.length === 0) {
             throw new Error("Dongchedi browser page exposed no car-series rows");
+          }
+          return data;
+        },
+        parseState: (state) => {
+          const data = parseDongchediSearchApiResponse(state.apiData, parameters.limit ?? 15);
+          if (data.items.length === 0) {
+            throw new Error("Dongchedi browser search API exposed no car-series rows");
           }
           return data;
         },
