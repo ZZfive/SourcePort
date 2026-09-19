@@ -45,7 +45,7 @@ const detailOperation: OperationDescriptor = {
   backends: [{ name: "wuhan-listings-public", kind: "public-http", priority: 0 }, { name: "wuhan-listings-browser", kind: "opencli", priority: 1 }, { name: "wuhan-listings-manual", kind: "manual-step", priority: 99 }], auth: "optional", freshnessClass: "volatile",
 };
 
-const allowedHosts = new Set(["wh.ke.com", "m.ke.com", "www.ke.com", "wh.fang.com", "wuhan.fang.com", "m.fang.com"]);
+const allowedHosts = new Set(["wh.ke.com", "m.ke.com", "www.ke.com", "wh.fang.ke.com", "wh.fang.com", "wuhan.fang.com", "m.fang.com"]);
 function validUrl(value: string): boolean { try { const url = new URL(value); return url.protocol === "https:" && allowedHosts.has(url.hostname); } catch { return false; } }
 function clean(value: string): string { return value.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/gi, " ").replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim(); }
 function sha(value: string): string { let hash = 2166136261; for (const char of value) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619); return `lead:${(hash >>> 0).toString(16)}`; }
@@ -63,12 +63,20 @@ function extract(text: string, kind: ListingKind, city: string, url: string, ret
     const community = title.replace(/\s*(?:3室|2室|1室|四室|三室|两室|一室).*$/u, "").trim() || title.slice(0, 32);
     const id = sha(`${sourceUrl}:${title}`);
     if (seen.has(id)) continue;
+    const priceRange = nearby.match(/(\d+(?:\.\d+)?)\s*[-~至]\s*(\d+(?:\.\d+)?)\s*万/);
     const price = nearby.match(/(\d+(?:\.\d+)?)\s*万/);
+    const areaRange = nearby.match(/(\d+(?:\.\d+)?)\s*[-~至]\s*(\d+(?:\.\d+)?)\s*(?:㎡|平方米)/);
     const area = nearby.match(/(\d+(?:\.\d+)?)\s*(?:㎡|平方米)/);
     const layout = nearby.match(/([1-6])室\s*([0-3])厅/);
-    const parsedArea = number(area?.[1]);
-    const parsedPrice = number(price?.[1]);
-    const item: ListingLead = { candidateId: id, kind, city, community, title, sourceUrl, retrievedAt, evidenceStatus: "lead-only", ...(parsedPrice === undefined ? {} : { priceCny: { minimumCny: parsedPrice * 10000, maximumCny: parsedPrice * 10000 } }), ...(parsedArea === undefined ? {} : { areaSqm: parsedArea }), ...(layout ? { bedrooms: Number(layout[1]), livingRooms: Number(layout[2]) } : {}) };
+    const path = new URL(sourceUrl).pathname;
+    const isStructuredListing = kind === "resale"
+      ? /\/ershoufang\/(?:[^/]+\/)?[^/]+\.html$/i.test(path) || /\/xf\/wuhan\/\d+\.htm$/i.test(path)
+      : /\/loupan\/p_[^/]+/i.test(path) || /\/xf\/wuhan\/\d+\.htm$/i.test(path);
+    if (!isStructuredListing || (!price && !area && !layout && !/\d+\.html$/.test(path))) continue;
+    const parsedArea = number(areaRange?.[1] ?? area?.[1]);
+    const parsedPrice = number(priceRange?.[1] ?? price?.[1]);
+    const parsedPriceMaximum = number(priceRange?.[2] ?? price?.[1]);
+    const item: ListingLead = { candidateId: id, kind, city, community, title, sourceUrl, retrievedAt, evidenceStatus: "lead-only", ...(parsedPrice === undefined ? {} : { priceCny: { minimumCny: parsedPrice * 10000, maximumCny: (parsedPriceMaximum ?? parsedPrice) * 10000 } }), ...(parsedArea === undefined ? {} : { areaSqm: parsedArea }), ...(layout ? { bedrooms: Number(layout[1]), livingRooms: Number(layout[2]) } : {}) };
     items.push(item); seen.add(id); if (items.length >= limit) break;
   }
   if (!items.length) throw new Error("listing page exposed no stable listing leads");

@@ -14,10 +14,13 @@ sourceport run wuhan-listings search-listings \
 The `city` parameter is supplied by the caller and must match the market
 represented by the requested source URL. It is not a user profile default.
 
-The current public route is the Wuhan Fang.com portal. Lianjia/Beike hosts are
+The current public routes include the Wuhan Fang.com portal and Beike's
+`m.ke.com/wh/ershoufang` and `wh.fang.ke.com` pages. Lianjia/Beike hosts are
 allowlisted for explicitly supplied listing URLs, but their access state is
-reported independently. In the current environment, `search-listings` is
-healthy through Fang.com public HTTP; `get-listing` remains explicitly
-drifted/blocked because the public detail response does not expose a stable
-exact property identity. Browser and manual recovery paths stay visible when a
-site returns captcha, login, or a shape different from the operation schema.
+reported independently. Beike pages may return captcha or navigation-only HTML
+in automated HTTP sessions; the parser therefore accepts only structured detail
+links and reports source drift instead of promoting navigation links to leads.
+`get-listing` remains explicitly drifted/blocked when the public detail response
+does not expose a stable exact property identity. Browser and manual recovery
+paths stay visible when a site returns captcha, login, or a shape different from
+the operation schema.
