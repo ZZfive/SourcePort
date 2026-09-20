@@ -40,6 +40,7 @@ export interface RouteEvidence {
   evidenceStatus: "source-verified" | "unresolved";
   url: string;
   retrievedAt: string;
+  validUntil: string;
 }
 
 const routeOperation: OperationDescriptor = {
@@ -78,6 +79,7 @@ const routeOperation: OperationDescriptor = {
       evidenceStatus: { enum: ["source-verified", "unresolved"] },
       url: { type: "string", minLength: 1 },
       retrievedAt: { type: "string", minLength: 1 },
+      validUntil: { type: "string", minLength: 1 },
     },
   },
   backends: [
@@ -129,6 +131,7 @@ function parseRoute(body: string, parameters: Record<string, unknown>): RouteEvi
   const durationMinutes = parseDuration(text);
   const distanceKm = parseDistance(text);
   const retrievedAt = new Date().toISOString();
+  const validUntil = new Date(Date.parse(retrievedAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
   return {
     ...(parameters["candidateId"] ? { candidateId: String(parameters["candidateId"]) } : {}),
     ...(parameters["anchorId"] ? { anchorId: String(parameters["anchorId"]) } : {}),
@@ -141,6 +144,7 @@ function parseRoute(body: string, parameters: Record<string, unknown>): RouteEvi
     evidenceStatus: durationMinutes === undefined ? "unresolved" : "source-verified",
     url,
     retrievedAt,
+    validUntil,
   };
 }
 

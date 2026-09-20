@@ -464,4 +464,18 @@ describe("SourcePort CLI", () => {
     expect(output.stdout.join("")).toContain("购买序列后的现金储备：290000 元");
     expect(output.stderr).toEqual([]);
   });
+
+  it("renders a purchase plan from a private profile and separate property report", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sourceport-purchase-plan-"));
+    try {
+      const profileFile = join(directory, "profile.json");
+      const propertyFile = join(directory, "property.json");
+      await writeFile(profileFile, JSON.stringify({ finance: { monthlyNetIncomeCny: 30000, annualBaselineSpendCny: 120000, liquidReserveCny: 1000000, reserveMonths: 18 } }), "utf8");
+      await writeFile(propertyFile, JSON.stringify({ status: "partial", candidates: [{ candidateId: "c1", identity: { community: "示例小区" }, eligibility: "needs-verification", identityStatus: "community-bound", actionItems: ["核验产权"], verificationTasks: [] }] }), "utf8");
+      const output = capture();
+      const exitCode = await runCli(["purchase-plan", "--profile-file", profileFile, "--property-report", propertyFile, "--format", "md"], output.io);
+      expect(exitCode).toBe(0);
+      expect(output.stdout.join("")).toContain("示例小区");
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
 });

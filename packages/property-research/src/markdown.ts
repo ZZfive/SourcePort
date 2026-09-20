@@ -6,6 +6,7 @@ export function renderPropertyResearchMarkdown(report: PropertyResearchReport): 
     const price = candidate.allInCost.estimateRange ?? candidate.allInCost.range;
     lines.push(`## ${candidate.identity.community}（${candidate.kind === "new" ? "新房" : "二手房"}）`);
     lines.push(`- 资格：${candidate.eligibility}`);
+    lines.push(`- 身份状态：${candidate.identityStatus}`);
     lines.push(`- 户型：${candidate.attributes.bedrooms ?? "未知"}室${candidate.attributes.livingRooms ?? "未知"}厅`);
     if (candidate.askingPrice) lines.push(`- 挂牌价：${candidate.askingPrice.minimumCny}–${candidate.askingPrice.maximumCny} 元（不是成交价）`);
     const nonAskingObservations = candidate.priceObservations.filter((item) => item.kind !== "asking");
@@ -14,7 +15,9 @@ export function renderPropertyResearchMarkdown(report: PropertyResearchReport): 
     lines.push(`- 已核验费用证据下限：${candidate.allInCost.verifiedLowerBoundCny} 元；缺项：${candidate.allInCost.missingComponents.join("、") || "无"}`);
     lines.push(`- 月供情景：${candidate.financing.scenarios.length ? `${Math.min(...candidate.financing.scenarios.map((item) => item.monthlyPaymentCny))}–${Math.max(...candidate.financing.scenarios.map((item) => item.monthlyPaymentCny))} 元/月` : "未知"}`);
     lines.push(`- 通勤：${candidate.commute.map((item) => `${item.label}=${item.minutes === undefined ? "未知" : `${item.minutes} 分钟`}`).join("；") || "未知"}`);
+    if (candidate.routes.length) lines.push(`- 路线证据：${candidate.routes.map((item) => `${item.anchorId}=${item.durationMinutes === undefined ? "未解析" : `${item.durationMinutes} 分钟`}（${item.status}）`).join("；")}`);
     lines.push(`- 核验：${candidate.criterionResults.map((item) => `${item.criterion.label}=${item.status}`).join("；")}`, ``);
+    if (candidate.verificationTasks.length) lines.push(`- 核验任务：${candidate.verificationTasks.map((item) => `${item.phase}:${item.status}:${item.requirement}`).join("；")}`);
     if (candidate.actionItems.length) lines.push(`- 买前动作：${candidate.actionItems.join("；")}`);
   }
   if (report.rejected.length) {

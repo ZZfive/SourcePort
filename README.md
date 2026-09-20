@@ -503,6 +503,18 @@ ongoing income and savings. Keep the values in a private runtime input:
 sourceport purchase-liquidity --input-file private/buyer-coach/liquidity.local.json --format md
 ~~~
 
+Generate a combined purchase plan with explicit liquidity pauses and property
+verification gates:
+
+~~~bash
+sourceport purchase-plan \\
+  --profile-file private/purchase-profile.json \\
+  --property-report private/property-report.json \\
+  --car-report private/car-report.json \\
+  --format md \\
+  --report-file private/purchase-plan.json
+~~~
+
 The input contains `finance` and `scenario`. Scenario fields can include
 `carPurchaseAfterMonths` and `propertyPurchaseAfterMonths`, so savings earned
 between two purchases are included. A missing reserve floor keeps the result

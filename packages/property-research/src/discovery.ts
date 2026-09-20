@@ -28,11 +28,23 @@ interface ListingSearchData {
   kind: "new" | "resale";
   items: ListingItem[];
 }
+interface OfficialDocumentSearchData {
+  query: string;
+  topic: string;
+  items: Array<{ title: string; url: string; snippet: string; topic: string }>;
+}
 
 interface RouteEvidenceData {
   candidateId?: string;
   anchorId?: string;
+  origin?: string;
+  destination?: string;
+  mode?: "driving" | "transit" | "walking" | "cycling";
+  departureWindow?: string;
   durationMinutes?: number;
+  distanceKm?: number;
+  retrievedAt?: string;
+  validUntil?: string;
   evidenceStatus: "source-verified" | "unresolved";
 }
 
@@ -75,7 +87,7 @@ const requestSchema = {
     required: ["source", "operation", "parameters"],
     properties: {
       source: { type: "string", minLength: 1 },
-      operation: { enum: ["search-listings", "get-route-evidence", "record-observation"] },
+      operation: { enum: ["search-listings", "search-property-documents", "get-route-evidence", "record-observation"] },
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -83,6 +95,7 @@ const requestSchema = {
         properties: {
           url: { type: "string", minLength: 1 },
           query: { type: "string", minLength: 1 },
+          topic: { type: "string", minLength: 1 },
           city: { type: "string", minLength: 1 },
           limit: { type: "integer", minimum: 1, maximum: 30 },
           candidateId: { type: "string", minLength: 1 },
@@ -123,9 +136,11 @@ export function validatePropertyDiscoveryRequests(input: unknown): ValidationRes
   result.value.forEach((request, index) => {
     const required = request.operation === "search-listings"
       ? ["url", "query", "kind", "city"]
-      : request.operation === "record-observation"
-        ? ["candidateId", "program", "channel", "city", "kind", "community", "observedAt"]
-        : ["url", "candidateId", "anchorId", "origin", "destination", "mode"];
+      : request.operation === "search-property-documents"
+        ? ["url", "query", "topic"]
+        : request.operation === "record-observation"
+          ? ["candidateId", "program", "channel", "city", "kind", "community", "observedAt"]
+          : ["url", "candidateId", "anchorId", "origin", "destination", "mode"];
     for (const field of required) {
       const value = request.parameters[field];
       if (typeof value !== "string" || !value.trim()) issues.push({ path: `${index}.parameters.${field}`, message: `must provide ${field} for ${request.operation}` });
@@ -163,10 +178,15 @@ function candidate(item: ListingItem, source: string, evidence: EvidenceRecord[]
   };
 }
 
-function resultData(result: SourceResult): ListingSearchData | RouteEvidenceData | MiniProgramObservationData | undefined {
+function resultData(result: SourceResult): ListingSearchData | OfficialDocumentSearchData | RouteEvidenceData | MiniProgramObservationData | undefined {
   if (!result.data || !object(result.data)) return undefined;
   const value = result.data as Record<string, unknown>;
-  if (Array.isArray(value["items"])) return value as unknown as ListingSearchData;
+  if (Array.isArray(value["items"])) {
+    const first = value["items"][0];
+    return first && object(first) && typeof first["topic"] === "string" && typeof first["snippet"] === "string"
+      ? value as unknown as OfficialDocumentSearchData
+      : value as unknown as ListingSearchData;
+  }
   if (value["evidenceStatus"] === "source-verified" || value["evidenceStatus"] === "unresolved") return value as unknown as RouteEvidenceData;
   if (value["evidenceStatus"] === "claimed" && typeof value["candidateId"] === "string" && typeof value["community"] === "string") return value as unknown as MiniProgramObservationData;
   return undefined;
@@ -180,6 +200,8 @@ function enrichCandidate(target: PropertyCandidateInput, data: MiniProgramObserv
         kind: priceKind,
         priceCny: data.purchasePrice,
         source: "wuhan-property-miniprograms",
+        candidateId: target.candidateId,
+        ...(data.address && data.building && data.unit && data.room ? { propertyIdentity: { city: data.city, community: data.community, building: data.building, unit: data.unit, room: data.room } } : {}),
         ...(data.sourceUrl ? { sourceUrl: data.sourceUrl } : {}),
         observedAt: data.observedAt,
         verification: "claimed" as const,
@@ -235,7 +257,20 @@ export async function discoverPropertyCandidates(
     const data = resultData(result);
     if (!data) continue;
     if (request.operation === "search-listings" && "items" in data) {
-      candidates.push(...data.items.map((item) => candidate(item, request.source, result.evidence)));
+      const listingData = data as ListingSearchData;
+      candidates.push(...listingData.items.map((item) => candidate(item, request.source, result.evidence)));
+      continue;
+    }
+    if (request.operation === "search-property-documents" && "items" in data) {
+      const candidateId = typeof request.parameters["candidateId"] === "string" ? request.parameters["candidateId"] : undefined;
+      const target = candidateId ? candidates.find(item => item.candidateId === candidateId) : undefined;
+      if (!target) {
+        warnings.push({ code: "official_document_candidate_unresolved", message: "official document search was not bound to a candidate" });
+      } else {
+        const official = data as OfficialDocumentSearchData;
+        target.evidence = [...(target.evidence ?? []), ...result.evidence];
+        target.sourceUrls = [...new Set([...(target.sourceUrls ?? []), ...official.items.map(item => item.url)])];
+      }
       continue;
     }
     if (request.operation === "get-route-evidence") {
@@ -245,10 +280,25 @@ export async function discoverPropertyCandidates(
         continue;
       }
       const target = candidates.find((item) => item.candidateId === route.candidateId);
-      if (target && route.durationMinutes !== undefined) {
-        target.commuteMinutes = { ...(target.commuteMinutes ?? {}), [route.anchorId]: route.durationMinutes };
+      if (target) {
+        if (route.durationMinutes !== undefined) target.commuteMinutes = { ...(target.commuteMinutes ?? {}), [route.anchorId]: route.durationMinutes };
         target.commuteEvidence = { ...(target.commuteEvidence ?? {}), [route.anchorId]: [...(target.commuteEvidence?.[route.anchorId] ?? []), ...result.evidence.map((item) => item.id)] };
         target.evidence = [...(target.evidence ?? []), ...result.evidence];
+        target.routes = [...(target.routes ?? []), {
+          candidateId: route.candidateId,
+          anchorId: route.anchorId,
+          origin: route.origin ?? "unknown",
+          destination: route.destination ?? "unknown",
+          mode: route.mode ?? "transit",
+          departureWindow: route.departureWindow ?? "unknown",
+          retrievedAt: route.retrievedAt ?? new Date().toISOString(),
+          validUntil: route.validUntil ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          ...(route.durationMinutes === undefined ? {} : { durationMinutes: route.durationMinutes }),
+          ...(route.distanceKm === undefined ? {} : { distanceKm: route.distanceKm }),
+          evidenceIds: result.evidence.map((item) => item.id),
+          status: route.evidenceStatus,
+        }];
+        if (route.durationMinutes === undefined) warnings.push({ code: "route_evidence_unresolved", message: `route evidence for '${route.anchorId}' did not expose a duration` });
       } else {
         warnings.push({ code: "route_evidence_unresolved", message: target ? `route evidence for '${route.anchorId}' did not expose a duration` : `route evidence referenced unknown candidate '${route.candidateId}'` });
       }

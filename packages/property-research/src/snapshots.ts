@@ -9,6 +9,15 @@ export interface PropertySnapshot {
   room?: string;
   fields: Record<string, unknown>;
   sourceEvidenceIds: string[];
+  validUntil?: string;
+}
+
+export type PropertySnapshotFreshness = "live" | "stale" | "unknown";
+
+export function propertySnapshotFreshness(snapshot: PropertySnapshot, now = new Date()): PropertySnapshotFreshness {
+  if (!snapshot.validUntil) return "unknown";
+  const timestamp = Date.parse(snapshot.validUntil);
+  return Number.isFinite(timestamp) && now.getTime() <= timestamp ? "live" : "stale";
 }
 
 export interface PropertySnapshotStore {

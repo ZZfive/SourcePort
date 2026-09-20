@@ -4,9 +4,10 @@ import { deduplicatePropertyCandidates } from "./entity-resolution.js";
 import { eligibilityFromCriteria, evaluatePropertyCriteria } from "./criteria.js";
 import { PROPERTY_RESEARCH_LIMITS, resolvedPropertyLimits, validatePropertyResearchBrief, type PropertyCandidate, type PropertyCandidateInput, type PropertyResearchBrief, type PropertyResearchDependencies, type PropertyResearchReport, type PropertyRiskEvidence } from "./contracts.js";
 import { validatePropertyCandidates } from "./validation.js";
+import { assessPropertyWorkflow } from "./gates.js";
 
 function propertyRiskEvidenceRecord(evidence: PropertyRiskEvidence): EvidenceRecord {
-  return { id: evidence.id, source: evidence.source, operation: "property-research-risk-evidence", backend: "brief", retrievedAt: evidence.retrievedAt, ...(evidence.sourceUrl ? { sourceUrl: evidence.sourceUrl } : {}), fragment: evidence, verification: "claimed" };
+  return { id: evidence.id, source: evidence.source, operation: "property-research-risk-evidence", backend: "brief", retrievedAt: evidence.retrievedAt, ...(evidence.sourceUrl ? { sourceUrl: evidence.sourceUrl } : {}), fragment: evidence, verification: evidence.verification ?? "claimed" };
 }
 
 function defaultCriteria(brief: PropertyResearchBrief) {
@@ -20,26 +21,36 @@ function defaultCriteria(brief: PropertyResearchBrief) {
 }
 
 function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBrief, now: Date): PropertyCandidate {
-  const allInCost = calculateAllInCost({ market: brief.market.city, candidateIds: [input.candidateId], now, ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}), ...(input.costEvidence ? { costEvidence: input.costEvidence } : {}) });
+  const candidateIdentity = input.building && input.unit && input.room ? { city: input.city, community: input.community, building: input.building, unit: input.unit, room: input.room } : undefined;
+  const allInCost = calculateAllInCost({ market: brief.market.city, candidateIds: [input.candidateId], ...(candidateIdentity ? { candidateIdentity } : {}), now, ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}), ...(input.costEvidence ? { costEvidence: input.costEvidence } : {}) });
   const financing = calculateMortgageScenarios({ ...(input.purchasePrice ? { purchasePrice: input.purchasePrice } : {}), allInCost, ...(brief.financing ? { downPaymentRatios: brief.financing.downPaymentRatios, annualRates: brief.financing.annualRates, termsMonths: brief.financing.termsMonths } : {}) });
   const explicitCriteria = new Set((brief.criteria ?? []).map((criterion) => criterion.key));
   const askingCriteria = input.askingPrice && !explicitCriteria.has("budget.asking.maxCny")
     ? [{ key: "budget.asking.maxCny", label: "挂牌价上限（线索筛选）", kind: "hard" as const, priority: 99, requirement: { max: brief.budget.maximumAllInCny } }]
     : [];
   const criteria = [...defaultCriteria(brief), ...askingCriteria, ...(brief.criteria ?? [])];
-  const criterionResults = evaluatePropertyCriteria({ criteria, candidate: input, cost: allInCost });
+
   const commute = brief.commuteAnchors.map((anchor) => ({ anchorId: anchor.id, label: anchor.label, ...(input.commuteMinutes?.[anchor.id] === undefined ? {} : { minutes: input.commuteMinutes[anchor.id] }), status: input.commuteMinutes?.[anchor.id] === undefined ? "unknown" as const : "known" as const, evidenceIds: input.commuteEvidence?.[anchor.id] ?? [] }));
   const evidence = [...(input.evidence ?? []), ...(input.costEvidence ?? []).map(propertyCostEvidenceRecord), ...(input.riskEvidence ?? []).map(propertyRiskEvidenceRecord)];
   const dueDiligence = input.riskEvidence?.map((risk) => ({ criterion: { key: `risk.${risk.category}`, label: risk.category, kind: "hard" as const, priority: 90, requirement: "clear" }, status: risk.status === "clear" ? "pass" as const : risk.status === "issue" ? "fail" as const : "unknown" as const, message: risk.summary, evidenceIds: [risk.id] })) ?? [];
   const commuteValues = commute.flatMap(item => item.minutes === undefined ? [] : [item.minutes]);
   const observations = input.observations ?? [input];
+
   const conflicts: Array<{ field: string; values: unknown[] }> = [];
   for (const field of ["kind", "city", "community", "address", "areaSqm", "bedrooms", "livingRooms", "floor", "constructionYear", "propertyRightsYears", "askingPrice", "purchasePrice"]) {
-    const values = [...new Map(observations.map(item => [JSON.stringify(item[field as keyof PropertyCandidateInput]), item[field as keyof PropertyCandidateInput]])).values()];
+    const values = [...new Map(observations.filter(item => item[field as keyof PropertyCandidateInput] !== undefined).map(item => [JSON.stringify(item[field as keyof PropertyCandidateInput]), item[field as keyof PropertyCandidateInput]])).values()];
     if (values.length > 1) conflicts.push({ field, values });
   }
   if (conflicts.length) allInCost.reasons.push(`conflicting observations require reconciliation: ${conflicts.map(item => item.field).join(", ")}`);
   if (conflicts.length) allInCost.status = "conflict";
+  const workflow = assessPropertyWorkflow(input, brief, allInCost, now);
+  const criterionResults = evaluatePropertyCriteria({ criteria, candidate: input, cost: allInCost });
+  const riskCriterion = criterionResults.find(x => x.criterion.key === "risk.noCriticalIssue");
+  if (riskCriterion && workflow.gates.find(x => x.phase === "document")?.status !== "passed" && riskCriterion.status !== "fail") {
+    riskCriterion.status = "unknown";
+    riskCriterion.message = "required exact-property document checks remain unresolved";
+  }
+  if (workflow.identityStatus === "identity-conflict") criterionResults.push({ criterion: { key: "identity", label: "房产身份", kind: "hard", priority: 100, requirement: "unit-bound" }, status: "conflict", message: "property identity conflict", evidenceIds: [] });
   const actionItems = [
     ...(input.askingPrice && !input.purchasePrice ? ["将挂牌价与同小区近期成交价或明确议价证据核验后，再判断总包预算"] : []),
     ...(allInCost.status !== "known" ? ["核验交易价、税费、中介费、维修基金、装修和车位等总包组成"] : []),
@@ -49,6 +60,7 @@ function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBr
   return {
     candidateId: input.candidateId,
     eligibility: eligibilityFromCriteria(criterionResults),
+    ...workflow,
     kind: input.kind,
     identity: { city: input.city, ...(input.district ? { district: input.district } : {}), community: input.community, ...(input.address ? { address: input.address } : {}), ...(input.building ? { building: input.building } : {}), ...(input.unit ? { unit: input.unit } : {}), ...(input.room ? { room: input.room } : {}) },
     attributes: { ...(input.areaSqm === undefined ? {} : { areaSqm: input.areaSqm }), ...(input.bedrooms === undefined ? {} : { bedrooms: input.bedrooms }), ...(input.livingRooms === undefined ? {} : { livingRooms: input.livingRooms }), ...(input.floor ? { floor: input.floor } : {}), ...(input.constructionYear === undefined ? {} : { constructionYear: input.constructionYear }), ...(input.propertyRightsYears === undefined ? {} : { propertyRightsYears: input.propertyRightsYears }), ...(input.developer ? { developer: input.developer } : {}), ...(input.deliveryDate ? { deliveryDate: input.deliveryDate } : {}) },
@@ -60,6 +72,8 @@ function buildCandidate(input: PropertyCandidateInput, brief: PropertyResearchBr
     financing,
     commute,
     risks: input.riskEvidence ?? [],
+    checkEvidence: input.checkEvidence ?? [],
+    routes: input.routes ?? [],
     dueDiligence,
     observations,
     conflicts,
@@ -107,8 +121,8 @@ export async function researchProperties(input: unknown, dependencies: PropertyR
     const eligibility = { eligible: 0, "needs-verification": 1, rejected: 2 } as const;
     const status = eligibility[a.eligibility] - eligibility[b.eligibility];
     if (status) return status;
-    const aWorst = Math.max(...a.commute.flatMap((item) => item.minutes === undefined ? [] : [item.minutes]), Number.POSITIVE_INFINITY);
-    const bWorst = Math.max(...b.commute.flatMap((item) => item.minutes === undefined ? [] : [item.minutes]), Number.POSITIVE_INFINITY);
+    const aWorst = a.commuteSummary.complete ? (a.commuteSummary.worstMinutes ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+    const bWorst = b.commuteSummary.complete ? (b.commuteSummary.worstMinutes ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
     if (aWorst !== bWorst) return aWorst - bWorst;
     return (a.allInCost.estimateRange?.minimumCny ?? a.askingPrice?.minimumCny ?? Number.POSITIVE_INFINITY) - (b.allInCost.estimateRange?.minimumCny ?? b.askingPrice?.minimumCny ?? Number.POSITIVE_INFINITY);
   });

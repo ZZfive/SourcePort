@@ -73,6 +73,7 @@ research-cars Codex Skill
 | <code>@sourceport/cli</code> | 来源发现、operation 执行、doctor 和买车研究 CLI |
 | <code>@sourceport/car-research</code> | 有界跨来源买车研究和确定性报告 |
 | <code>@sourceport/property-research</code> | 按输入城市开展新房和二手房的有界研究、总包成本、双通勤和核验缺口 |
+| <code>@sourceport/purchase-coach</code> | 车房共享的家庭现金流、购买时序、核验任务和签约门槛 |
 | <code>@sourceport/wuhan-housing</code> | 武汉住更局、公积金和政府门户的官方住房页面获取与诊断 |
 | <code>@sourceport/property-routes</code> | 保存地图路线的出行方式、时段、耗时和距离证据，并保留浏览器/人工恢复路径 |
 | <code>@sourceport/wuhan-property-miniprograms</code> | 接收武汉房产小程序或浏览器辅助观察，保留分享标识并明确标记为 claimed |
@@ -464,6 +465,20 @@ sourceport property snapshot --input-file private/property-snapshot.json --store
 sourceport property timeline --store reports/property-snapshots --candidate-id candidate-1
 sourceport property feedback --input-file private/property-feedback.json
 ~~~
+
+生成车房共享的家庭购买计划，个人数据只从私有运行时文件读取：
+
+~~~bash
+sourceport purchase-plan \\
+  --profile-file private/purchase-profile.json \\
+  --property-report private/property-report.json \\
+  --car-report private/car-report.json \\
+  --format md \\
+  --report-file private/purchase-plan.json
+~~~
+
+计划会输出现金储备底线、车房购买时序、房产身份状态、核验任务、贷款资格缺口
+和签约门槛。挂牌价、通用政策页和月供情景不会被当作成交、产权或贷款审批证明。
 
 同一个 discovery 文件还可以加入
 `wuhan-property-miniprograms:record-observation`。只有提供小程序分享标识或

@@ -27,6 +27,7 @@ import {
   clusterPropertyFeedback,
   createFilePropertySnapshotStore,
   diffPropertySnapshots,
+  propertySnapshotFreshness,
   type PropertySnapshot,
 } from "@sourceport/property-research";
 import {
@@ -60,7 +61,7 @@ import { WuhanHousingAdapter } from "@sourceport/wuhan-housing";
 import { WuhanListingsAdapter } from "@sourceport/wuhan-listings";
 import { PropertyRoutesAdapter } from "@sourceport/property-routes";
 import { WuhanPropertyMiniProgramsAdapter } from "@sourceport/wuhan-property-miniprograms";
-import { assessHouseholdLiquidity, type LiquidityAssessment } from "@sourceport/purchase-coach";
+import { assessHouseholdLiquidity, createPurchasePlan, renderPurchasePlanMarkdown, type LiquidityAssessment, type BuyerProfile } from "@sourceport/purchase-coach";
 
 import { doctorExitCode, formatDoctorHuman } from "./commands/doctor.js";
 
@@ -109,6 +110,9 @@ function renderLiquidityMarkdown(result: LiquidityAssessment): string {
     `- 购买序列后的现金储备：${result.remainingReserveCny} 元`,
     `- 过程最低现金储备：${result.minimumReserveCny} 元`,
     `- 合计月供：${result.combinedMonthlyPaymentCny} 元`,
+    `- 月供状态：${result.paymentStatus}`,
+    `- 月供后月度现金流：${result.postPurchaseMonthlyCashFlowCny} 元`,
+    `- 是否暂停：${result.paused ? "是" : "否"}`,
     `- 状态：${result.status}`,
     `- 判断：${result.reasons.join("；")}`,
     "",
@@ -328,6 +332,31 @@ export async function runCli(
       }
     }
 
+    if (command === "purchase-plan") {
+      const parsed = parseArgs({
+        args: [...argv.slice(1)], allowPositionals: false, strict: true,
+        options: { "profile-file": { type: "string" }, "property-report": { type: "string" }, "car-report": { type: "string" }, format: { type: "string", default: "json" }, "report-file": { type: "string" } },
+      });
+      const profileFile = parsed.values["profile-file"];
+      const propertyFile = parsed.values["property-report"];
+      const carFile = parsed.values["car-report"];
+      const format = parsed.values.format;
+      if (!profileFile || format !== "json" && format !== "md") {
+        writeJson(stderr, cliError("invalid_cli_input", "purchase-plan requires --profile-file and --format json|md")); return 2;
+      }
+      try {
+        const profile = await readJsonFile(profileFile) as BuyerProfile;
+        const property = propertyFile ? await readJsonFile(propertyFile) as Record<string, unknown> : undefined;
+        const car = carFile ? await readJsonFile(carFile) as Record<string, unknown> : undefined;
+        const report = createPurchasePlan(profile, property as never, car as never);
+        await saveJsonFile(parsed.values["report-file"], report);
+        if (format === "md") stdout(renderPurchasePlanMarkdown(report)); else writeJson(stdout, report);
+        return 0;
+      } catch (error) {
+        writeJson(stderr, cliError("invalid_cli_input", error instanceof Error ? error.message : "invalid purchase-plan input")); return 2;
+      }
+    }
+
     if (command === "research-cars") {
       const parsed = parseArgs({
         args: [...argv.slice(1)],
@@ -541,7 +570,7 @@ export async function runCli(
         }
         const snapshot = await readJsonFile(inputFile) as PropertySnapshot;
         await createFilePropertySnapshotStore(storeDirectory).save(snapshot);
-        writeJson(stdout, snapshot);
+        writeJson(stdout, { ...snapshot, freshness: propertySnapshotFreshness(snapshot, now()) });
         return 0;
       }
       if (subcommand === "timeline") {
@@ -848,7 +877,7 @@ export async function runCli(
       stderr,
       cliError(
         "invalid_cli_input",
-        "expected sources, capabilities, run, doctor, research-cars, purchase-liquidity, research-property, property-discover, property snapshot|timeline|feedback, car-context collect, or context collect|compile command",
+        "expected sources, capabilities, run, doctor, research-cars, purchase-liquidity, purchase-plan, research-property, property-discover, property snapshot|timeline|feedback, car-context collect, or context collect|compile command",
       ),
     );
     return 2;

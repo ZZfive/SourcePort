@@ -40,7 +40,12 @@ describe("Wuhan housing source", () => {
   it("exposes the official page operation", () => {
     const adapter = new WuhanHousingAdapter({ fetch: async () => new Response("<title>官方页面</title><article>武汉住房政策正文足够长。</article>", { status: 200, headers: { "content-type": "text/html" } }) });
     expect(adapter.manifest().source).toBe("wuhan-housing");
-    expect(adapter.operations().map((operation) => operation.operation)).toEqual(["get-official-page", "get-property-document"]);
+    expect(adapter.operations().map((operation) => operation.operation)).toEqual(["get-official-page", "search-property-documents", "get-property-document"]);
+  });
+
+  it("searches official documents without turning a policy hit into an exact match", () => {
+    const result = __test__.parseDocumentSearch("<a href='/project.html'>目标项目预售许可</a>", { url: "https://zgj.wuhan.gov.cn/search.html", query: "目标项目", topic: "presale-permit" });
+    expect(result.items[0]).toEqual(expect.objectContaining({ title: "目标项目预售许可", topic: "presale-permit" }));
   });
 
   it("routes a valid official page through public HTTP and preserves evidence", async () => {

@@ -22,6 +22,22 @@ export type PropertyKind = "new" | "resale";
 export type CriterionStatus = "pass" | "fail" | "unknown" | "conflict" | "unsupported";
 export type PropertyEligibility = "eligible" | "needs-verification" | "rejected";
 export type PropertyPriceKind = "asking" | "transaction" | "offer" | "tax-assessment";
+export type PropertyIdentityStatus = "lead-only" | "community-bound" | "unit-bound" | "identity-conflict";
+
+export type PropertyVerificationPhase = "viewing" | "document" | "finance" | "negotiation" | "contract";
+export type PropertyVerificationTaskStatus = "open" | "passed" | "blocked" | "waived";
+
+export interface PropertyVerificationTask {
+  id: string;
+  candidateId: string;
+  phase: PropertyVerificationPhase;
+  requirement: string;
+  evidenceNeeded: string[];
+  status: PropertyVerificationTaskStatus;
+  evidenceIds: string[];
+  dueAt?: string;
+  reason?: string;
+}
 
 export interface PropertyPriceObservation {
   id: string;
@@ -32,6 +48,10 @@ export interface PropertyPriceObservation {
   observedAt: string;
   verification?: EvidenceRecord["verification"];
   scope?: string;
+  candidateId?: string;
+  propertyIdentity?: PropertyEvidenceIdentity;
+  validUntil?: string;
+  evidenceIds?: string[];
 }
 
 export type PropertyCostComponent =
@@ -67,6 +87,41 @@ export interface CommuteAnchor {
   priority?: "primary" | "secondary";
 }
 
+export interface PropertyEvidenceIdentity {
+  city: string;
+  community: string;
+  building: string;
+  unit: string;
+  room: string;
+}
+
+export interface PropertyCheckEvidence {
+  id: string;
+  candidateId: string;
+  propertyIdentity: PropertyEvidenceIdentity;
+  check: string;
+  outcome: "clear" | "issue" | "unknown" | "not-applicable";
+  summary: string;
+  checkedAt: string;
+  validUntil: string;
+  evidenceIds: string[];
+}
+
+export interface PropertyRouteObservation {
+  candidateId: string;
+  anchorId: string;
+  origin: string;
+  destination: string;
+  mode: "driving" | "transit" | "walking" | "cycling";
+  departureWindow: string;
+  retrievedAt: string;
+  validUntil: string;
+  durationMinutes?: number;
+  distanceKm?: number;
+  evidenceIds: string[];
+  status: "source-verified" | "unresolved";
+}
+
 export interface PropertyCostEvidence {
   id: string;
   component: PropertyCostComponent;
@@ -78,6 +133,8 @@ export interface PropertyCostEvidence {
   retrievedAt: string;
   market?: string;
   applicability: string;
+  propertyIdentity?: PropertyEvidenceIdentity;
+  priceKind?: PropertyPriceKind;
   candidateId?: string;
   validUntil?: string;
   verification?: EvidenceRecord["verification"];
@@ -121,6 +178,11 @@ export interface PropertyResearchBrief {
   };
   commuteAnchors: CommuteAnchor[];
   financing?: {
+    mode?: "cash" | "commercial" | "provident-fund" | "combined";
+    homeOwnership?: "first-home" | "second-home" | "unknown";
+    monthlyIncomeCny?: number;
+    existingMonthlyDebtCny?: number;
+    providentFund?: { monthlyContributionCny?: number; balanceCny?: number };
     downPaymentRatios: number[];
     annualRates: number[];
     termsMonths: number[];
@@ -173,6 +235,9 @@ export interface PropertyCandidateInput {
   evidence?: EvidenceRecord[];
   sourceUrls?: string[];
   observations?: PropertyCandidateInput[];
+  identityStatus?: PropertyIdentityStatus;
+  checkEvidence?: PropertyCheckEvidence[];
+  routes?: PropertyRouteObservation[];
 }
 
 export interface PropertyCostComponentResult {
@@ -219,6 +284,8 @@ export interface CommuteResult {
   label: string;
   minutes?: number;
   status: "known" | "unknown";
+  reason?: string;
+  observations?: PropertyRouteObservation[];
   evidenceIds: string[];
 }
 
@@ -232,6 +299,7 @@ export interface CriterionResult {
 export interface PropertyCandidate {
   candidateId: string;
   eligibility: PropertyEligibility;
+  identityStatus: PropertyIdentityStatus;
   kind: PropertyKind;
   identity: {
     city: string;
@@ -260,11 +328,17 @@ export interface PropertyCandidate {
   financing: FinancingResult;
   commute: CommuteResult[];
   risks: PropertyRiskEvidence[];
+  checkEvidence: PropertyCheckEvidence[];
+  routes: PropertyRouteObservation[];
   dueDiligence: CriterionResult[];
   observations: PropertyCandidateInput[];
   conflicts: Array<{ field: string; values: unknown[] }>;
   commuteSummary: { worstMinutes?: number; meanMinutes?: number; complete: boolean };
   actionItems: string[];
+  verificationTasks: PropertyVerificationTask[];
+  gates: PropertyGateResult[];
+  loanEligibility: { status: "supported" | "unknown" | "conflict" | "ineligible" | "not-applicable"; checks: PropertyVerificationTask[] };
+  excludedChecks: Array<{ id: string; reason: string }>;
   criterionResults: CriterionResult[];
   evidenceIds: string[];
   sourceUrls: string[];
@@ -298,6 +372,14 @@ export interface PropertyResearchReport {
   failure?: { code: "invalid_brief" | "invalid_candidates" | "no_candidates"; message: string; issues?: Array<{ path: string; message: string }> };
 }
 
+export interface PropertyGateResult {
+  candidateId: string;
+  phase: PropertyVerificationPhase;
+  status: "open" | "passed" | "paused";
+  reasons: string[];
+  tasks: PropertyVerificationTask[];
+}
+
 export interface PropertyResearchDependencies {
   now?: () => Date;
   candidates?: unknown;
@@ -305,7 +387,7 @@ export interface PropertyResearchDependencies {
 
 export interface PropertyDiscoveryRequest {
   source: string;
-  operation: "search-listings" | "get-route-evidence" | "record-observation";
+  operation: "search-listings" | "search-property-documents" | "get-route-evidence" | "record-observation";
   parameters: Record<string, unknown>;
 }
 

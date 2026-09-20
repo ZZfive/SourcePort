@@ -42,6 +42,10 @@ evidence.
 6. Run the deterministic report first, then add source adapters and official
    evidence. Source failures, login walls, captcha, stale data, and source
    drift must remain visible with recovery actions.
+7. Treat `identityStatus`, `verificationTasks`, `gates`, and `loanEligibility`
+   as separate outputs. A candidate with unresolved identity, stale evidence,
+   missing finance checks, or conflicting observations cannot pass a contract
+   gate.
 
 ## Expected output
 
@@ -73,6 +77,21 @@ sourceport property-discover \
   --output-file private/property-candidates.json
 ```
 
+Generate the shared car/property purchase plan from private runtime inputs:
+
+```bash
+sourceport purchase-plan \
+  --profile-file private/purchase-profile.json \
+  --property-report private/property-report.json \
+  --car-report private/car-report.json \
+  --format md \
+  --report-file private/purchase-plan.json
+```
+
+The plan reports liquidity pauses, candidate verification tasks, contract-gate
+reasons, and unresolved evidence. It does not turn a listing, policy page, or
+monthly-payment scenario into a purchase or loan approval.
+
 Probe current Wuhan official policy evidence separately before using it in a
 candidate report:
 
@@ -81,3 +100,8 @@ sourceport doctor wuhan-housing --json
 sourceport run wuhan-housing get-official-page \
   --input '{"url":"https://gjj.wuhan.gov.cn/bsfw/ywzl/ywzn/dkyw/202412/t20241219_2504837.html","topic":"mortgage"}'
 ```
+
+For a concrete candidate, use `search-property-documents` to discover official
+documents and `get-property-document` to verify the exact property reference.
+The latter returns `identityMatch=unresolved` when the document does not name
+the candidate, so a generic policy page cannot clear a property gate.

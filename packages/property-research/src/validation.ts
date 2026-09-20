@@ -24,6 +24,11 @@ const briefSchema = object({
   layout: object({ bedrooms: count, livingRooms: count }),
   commuteAnchors: { type: "array", minItems: 1, maxItems: 8, items: object({ id: text, label: text, priority: { enum: ["primary", "secondary"] } }, ["id", "label"]) },
   financing: object({
+    mode: { enum: ["cash", "commercial", "provident-fund", "combined"] },
+    homeOwnership: { enum: ["first-home", "second-home", "unknown"] },
+    monthlyIncomeCny: positive,
+    existingMonthlyDebtCny: nonnegative,
+    providentFund: object({ monthlyContributionCny: nonnegative, balanceCny: nonnegative }),
     downPaymentRatios: { type: "array", minItems: 1, maxItems: 8, uniqueItems: true, items: { type: "number", minimum: 0, maximum: 1 } },
     annualRates: { type: "array", minItems: 1, maxItems: 8, uniqueItems: true, items: { type: "number", minimum: 0, maximum: 1 } },
     termsMonths: { type: "array", minItems: 1, maxItems: 8, uniqueItems: true, items: { type: "integer", minimum: 1, maximum: 600 } },
@@ -36,10 +41,11 @@ const briefSchema = object({
   }),
 }, ["query", "market", "housingTypes", "budget", "commuteAnchors"]);
 
+const propertyIdentity = object({ city: text, community: text, building: text, unit: text, room: text }, ["city", "community", "building", "unit", "room"]);
 const provenance = { id: text, source: text, sourceUrl: url, retrievedAt: timestamp, market: text, candidateId: text, validUntil: timestamp, verification };
-const priceObservation = object({ id: text, kind: { enum: ["asking", "transaction", "offer", "tax-assessment"] }, priceCny: range, source: text, sourceUrl: url, observedAt: timestamp, verification, scope: text }, ["id", "kind", "priceCny", "source", "observedAt"]);
+const priceObservation = object({ id: text, kind: { enum: ["asking", "transaction", "offer", "tax-assessment"] }, priceCny: range, source: text, sourceUrl: url, observedAt: timestamp, verification, scope: text, candidateId: text, propertyIdentity, validUntil: timestamp, evidenceIds: strings }, ["id", "kind", "priceCny", "source", "observedAt"]);
 const cost = object({
-  ...provenance, component: { enum: ["purchase-price", "deed-tax", "vat", "agency-fee", "registration", "maintenance-fund", "renovation", "parking", "loan-fee", "furnishings", "seller-tax", "other"] },
+  ...provenance, propertyIdentity, priceKind: { enum: ["asking", "offer", "transaction", "tax-assessment"] }, component: { enum: ["purchase-price", "deed-tax", "vat", "agency-fee", "registration", "maintenance-fund", "renovation", "parking", "loan-fee", "furnishings", "seller-tax", "other"] },
   minimumCny: nonnegative, maximumCny: nonnegative, mandatory: { type: "boolean" }, applicability: text,
 }, ["id", "component", "minimumCny", "maximumCny", "mandatory", "source", "retrievedAt", "applicability"]);
 const risk = object({
@@ -65,6 +71,17 @@ const candidateSchema = object({
   commuteMinutes: { type: "object", additionalProperties: nonnegative }, commuteEvidence: references, fieldEvidence: references,
   evidence: { type: "array", maxItems: 512, items: evidence }, sourceUrls: { type: "array", maxItems: 512, items: url },
   observations: { type: "array", maxItems: 64, items: {} },
+  checkEvidence: { type: "array", maxItems: 256, items: object({
+    id: text, candidateId: text, propertyIdentity, check: text, outcome: { enum: ["clear", "issue", "unknown", "not-applicable"] },
+    summary: text, checkedAt: timestamp, validUntil: timestamp, evidenceIds: strings,
+  }, ["id", "candidateId", "propertyIdentity", "check", "outcome", "summary", "checkedAt", "validUntil", "evidenceIds"]) },
+  routes: { type: "array", maxItems: 256, items: object({
+    candidateId: text, anchorId: text, origin: text, destination: text,
+    mode: { enum: ["driving", "transit", "walking", "cycling"] }, departureWindow: text,
+    retrievedAt: timestamp, validUntil: timestamp, durationMinutes: nonnegative, distanceKm: nonnegative,
+    evidenceIds: strings, status: { enum: ["source-verified", "unresolved"] },
+  }, ["candidateId", "anchorId", "origin", "destination", "mode", "departureWindow", "retrievedAt", "validUntil", "evidenceIds", "status"]) },
+  identityStatus: { enum: ["lead-only", "community-bound", "unit-bound", "identity-conflict"] },
 }, ["candidateId", "kind", "city", "community"]);
 
 /** Strict boundaries: unknown criteria are preserved; unknown structural fields are errors. */
@@ -88,10 +105,15 @@ export function validatePropertyCandidates(input: unknown): ValidationResult<Pro
   const ids = new Set<string>();
   for (const [index, candidate] of value.entries()) {
     const path = `candidates[${index}]`;
+    for (const observation of candidate.observations ?? []) {
+      const check = validateOperationOutput(observation, candidateSchema);
+      if (!check.ok || observation.observations?.length) issues.push({ path, message: "observations must be valid flat candidate observations" });
+    }
     if (ids.has(candidate.candidateId)) issues.push({ path, message: "candidateId must identify one source observation uniquely" });
     ids.add(candidate.candidateId);
     const ranges = [candidate.purchasePrice, candidate.askingPrice, candidate.listing?.priceCny, ...(candidate.listings ?? []).map(x => x.priceCny), ...(candidate.priceObservations ?? []).map(x => x.priceCny), ...(candidate.costEvidence ?? [])];
     if (ranges.some(x => x && x.minimumCny > x.maximumCny)) issues.push({ path, message: "money range minimum exceeds maximum" });
+    if (new Set((candidate.checkEvidence ?? []).map(x => x.id)).size !== (candidate.checkEvidence ?? []).length) issues.push({ path, message: "check evidence IDs must be unique" });
     const records = [...(candidate.evidence ?? []), ...(candidate.costEvidence ?? []), ...(candidate.riskEvidence ?? [])];
     for (const row of records) {
       const serialized = JSON.stringify(row);
@@ -101,7 +123,7 @@ export function validatePropertyCandidates(input: unknown): ValidationResult<Pro
     const available = new Set((candidate.evidence ?? []).map(x => x.id));
     const refs = [...Object.values(candidate.fieldEvidence ?? {}).flat(), ...Object.values(candidate.commuteEvidence ?? {}).flat()];
     for (const ref of refs) if (!available.has(ref)) issues.push({ path, message: `unresolved evidence reference ${ref}` });
-    const timestamps = [...records.flatMap(row => [row.retrievedAt, "validUntil" in row ? row.validUntil : undefined]), ...(candidate.priceObservations ?? []).map(row => row.observedAt), candidate.listing?.retrievedAt, candidate.listing?.publishedAt,
+    const timestamps = [...records.flatMap(row => [row.retrievedAt, "validUntil" in row ? row.validUntil : undefined]), ...(candidate.priceObservations ?? []).map(row => row.observedAt), ...(candidate.checkEvidence ?? []).flatMap(row => [row.checkedAt, row.validUntil]), ...(candidate.routes ?? []).flatMap(row => [row.retrievedAt, row.validUntil]), candidate.listing?.retrievedAt, candidate.listing?.publishedAt,
       ...(candidate.listings ?? []).flatMap(row => [row.retrievedAt, row.publishedAt])];
     if (timestamps.some(x => x !== undefined && !Number.isFinite(Date.parse(x)))) issues.push({ path, message: "invalid timestamp" });
     if (candidate.deliveryDate && (!Number.isFinite(Date.parse(candidate.deliveryDate)) || new Date(candidate.deliveryDate).toISOString().slice(0, 10) !== candidate.deliveryDate)) issues.push({ path, message: "invalid delivery date" });

@@ -31,4 +31,24 @@ describe("household liquidity assessment", () => {
     expect(result.minimumReserveCny).toBe(290_000);
     expect(result.status).toBe("within-floor");
   });
+
+  it("flags a temporary reserve-floor breach even when later savings recover it", () => {
+    const result = assessHouseholdLiquidity(
+      { monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 12 },
+      { propertyUpfrontCny: 900_000, propertyPurchaseAfterMonths: 0, evaluationMonths: 24 },
+    );
+    expect(result.minimumReserveCny).toBe(100_000);
+    expect(result.remainingReserveCny).toBeGreaterThan(result.reserveFloorCny!);
+    expect(result.status).toBe("below-floor");
+    expect(result.paused).toBe(true);
+  });
+
+  it("does not include disabled optional commitments", () => {
+    const result = assessHouseholdLiquidity(
+      { monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 12 },
+      { optionalCommitments: [{ id: "wedding", label: "wedding", amountCny: 500_000, afterMonths: 0, enabled: false }] },
+    );
+    expect(result.plannedCashOutlayCny).toBe(0);
+    expect(result.events.every(event => event.outlayCny === 0)).toBe(true);
+  });
 });

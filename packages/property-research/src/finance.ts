@@ -1,5 +1,5 @@
 import type { EvidenceRecord } from "@sourceport/core";
-import type { FinancingResult, MoneyRange, MortgageScenario, PropertyCostComponent, PropertyCostEvidence, PropertyCostResult, PropertyCostComponentResult } from "./contracts.js";
+import type { FinancingResult, MoneyRange, MortgageScenario, PropertyCostComponent, PropertyCostEvidence, PropertyCostResult, PropertyCostComponentResult, PropertyEvidenceIdentity } from "./contracts.js";
 
 function sumRanges(values: readonly MoneyRange[]): MoneyRange {
   return values.reduce((total, value) => ({ minimumCny: total.minimumCny + value.minimumCny, maximumCny: total.maximumCny + value.maximumCny }), { minimumCny: 0, maximumCny: 0 });
@@ -13,6 +13,7 @@ export const ALL_IN_COMPONENTS: readonly PropertyCostComponent[] = [
 export function calculateAllInCost(input: {
   market?: string;
   candidateIds?: readonly string[];
+  candidateIdentity?: PropertyEvidenceIdentity;
   now?: Date;
   purchasePrice?: MoneyRange;
   costEvidence?: readonly PropertyCostEvidence[];
@@ -22,10 +23,13 @@ export function calculateAllInCost(input: {
   const components: PropertyCostComponentResult[] = [];
   const grouped = new Map<PropertyCostComponent, PropertyCostEvidence[]>();
   for (const item of input.costEvidence ?? []) {
+    const identityMatches = !item.propertyIdentity || !input.candidateIdentity || ["city", "community", "building", "unit", "room"].every(key => item.propertyIdentity?.[key as keyof PropertyEvidenceIdentity] === input.candidateIdentity?.[key as keyof PropertyEvidenceIdentity]);
     const reason = item.market !== input.market ? "market missing or does not match"
       : !item.candidateId || !input.candidateIds?.includes(item.candidateId) ? "exact property applicability missing or different"
+      : !identityMatches ? "exact property identity does not match"
       : !item.validUntil || !(Date.parse(item.retrievedAt) <= now && now <= Date.parse(item.validUntil)) ? "evidence validity missing, stale, or future"
       : !item.sourceUrl || !item.verification || item.verification === "claimed" ? "documentary verification is missing"
+      : item.component === "purchase-price" && item.priceKind === "asking" ? "asking price cannot establish purchase price"
       : !item.mandatory ? "optional component not confirmed in total budget"
       : undefined;
     if (reason) { excludedEvidence.push({ id: item.id, reason }); continue; }
