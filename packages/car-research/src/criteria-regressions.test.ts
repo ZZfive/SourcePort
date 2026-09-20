@@ -83,6 +83,14 @@ describe("partial capability preferences", () => {
     expect(low.criterionResults[0]?.status).toBe("fail"); expect(high.criterionResults[0]?.status).toBe("fail");
     expect(compareCandidates(high, low)).toBeLessThan(0);
   });
+  it("prefers the newest model year when otherwise tied", () => {
+    const candidate = (id: string, year: string): CarCandidate => ({
+      candidateId: id, eligibility: "needs-verification", evidenceCompleteness: 1, sourceRatings: {},
+      trim: { trimId: id, name: "激光雷达版", year, officialPrice: "", dealerPrice: "", ownerPrice: "", sourceUrl: "", configurationUrl: "" },
+      criterionResults: [],
+    } as unknown as CarCandidate);
+    expect(compareCandidates(candidate("old", "2025"), candidate("new", "2027"))).toBeGreaterThan(0);
+  });
   it("retains reasons and evidence IDs for excluded delivery evidence", () => {
     expect(delivery([{ ...commitment, market: "上海" }])).toMatchObject({ status: "unknown", evidenceIds: ["delivery-1"] });
     expect(delivery([{ ...commitment, market: "上海" }]).message).toContain("different market");

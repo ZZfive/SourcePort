@@ -277,6 +277,11 @@ function eligibilityRank(value: CarCandidate["eligibility"]): number {
   return value === "eligible" ? 0 : value === "needs-verification" ? 1 : 2;
 }
 
+function modelYearRank(value: string): number {
+  const match = value.match(/(?:19|20)\d{2}/);
+  return match ? Number(match[0]) : -1;
+}
+
 export function compareCandidates(left: CarCandidate, right: CarCandidate): number {
   const eligibility = eligibilityRank(left.eligibility) - eligibilityRank(right.eligibility);
   if (eligibility !== 0) {
@@ -310,6 +315,13 @@ export function compareCandidates(left: CarCandidate, right: CarCandidate): numb
   const rightScore = right.sourceRatings.autohome ?? right.sourceRatings.dongchedi ?? -1;
   if (leftScore !== rightScore) {
     return rightScore - leftScore;
+  }
+  // When all recorded criteria and evidence are tied, prefer the newest
+  // on-sale model year so an older clearance trim cannot displace a current
+  // facelift merely because its source identifier sorts first.
+  const modelYear = modelYearRank(right.trim.year) - modelYearRank(left.trim.year);
+  if (modelYear !== 0) {
+    return modelYear;
   }
   return left.candidateId.localeCompare(right.candidateId);
 }
