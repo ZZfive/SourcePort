@@ -479,6 +479,7 @@ sourceport purchase-plan \\
 
 计划会输出现金储备底线、车房购买时序、房产身份状态、核验任务、贷款资格缺口
 和签约门槛。挂牌价、通用政策页和月供情景不会被当作成交、产权或贷款审批证明。
+计划中的购买若未填写月供，月供安全状态保持 `unknown`；全款且无月供时需显式填写 `0`。
 
 同一个 discovery 文件还可以加入
 `wuhan-property-miniprograms:record-observation`。只有提供小程序分享标识或

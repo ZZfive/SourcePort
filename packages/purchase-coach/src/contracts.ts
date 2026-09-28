@@ -48,6 +48,8 @@ export interface LiquidityAssessment {
   remainingReserveCny: number;
   minimumReserveCny: number;
   reserveFloorCny?: number;
+  /** Purchases whose monthly payment was not supplied; numeric payment totals include supplied inputs only. */
+  missingMonthlyPaymentInputs: Array<"car" | "property">;
   combinedMonthlyPaymentCny: number;
   paymentHeadroomCny?: number;
   events: PurchaseSequenceEvent[];

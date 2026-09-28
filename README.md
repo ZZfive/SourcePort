@@ -519,6 +519,8 @@ The input contains `finance` and `scenario`. Scenario fields can include
 `carPurchaseAfterMonths` and `propertyPurchaseAfterMonths`, so savings earned
 between two purchases are included. A missing reserve floor keeps the result
 `unknown` rather than claiming that a plan is safe.
+If a planned purchase has no monthly-payment input, payment safety also stays
+`unknown`; enter `0` explicitly for a cash purchase with no loan payment.
 
 Inline JSON is also supported:
 

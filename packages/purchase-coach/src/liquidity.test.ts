@@ -51,4 +51,18 @@ describe("household liquidity assessment", () => {
     expect(result.plannedCashOutlayCny).toBe(0);
     expect(result.events.every(event => event.outlayCny === 0)).toBe(true);
   });
+
+  it("keeps payment safety unknown when a planned purchase has no monthly payment input", () => {
+    const finance = { monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 12 };
+    const scenario = { propertyUpfrontCny: 800_000, combinedMonthlyPaymentCapCny: 10_000, carCashCny: 150_000, carMonthlyPaymentCny: 0 };
+    const unresolved = assessHouseholdLiquidity(finance, scenario);
+    expect(unresolved.paymentStatus).toBe("unknown");
+    expect(unresolved.paymentHeadroomCny).toBeUndefined();
+    expect(unresolved.missingMonthlyPaymentInputs).toEqual(["property"]);
+    expect(unresolved.paused).toBe(true);
+
+    const explicitCashPurchase = assessHouseholdLiquidity(finance, { ...scenario, propertyMonthlyPaymentCny: 0 });
+    expect(explicitCashPurchase.paymentStatus).toBe("within-cap");
+    expect(explicitCashPurchase.missingMonthlyPaymentInputs).toEqual([]);
+  });
 });

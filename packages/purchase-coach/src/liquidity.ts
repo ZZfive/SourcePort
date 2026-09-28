@@ -25,6 +25,10 @@ export function assessHouseholdLiquidity(finance: HouseholdFinanceInput, scenari
   const propertyMonth = months(scenario.propertyPurchaseAfterMonths, "propertyPurchaseAfterMonths");
   const carPayment = amount(scenario.carMonthlyPaymentCny, "carMonthlyPaymentCny");
   const propertyPayment = amount(scenario.propertyMonthlyPaymentCny, "propertyMonthlyPaymentCny");
+  const missingMonthlyPaymentInputs: Array<"car" | "property"> = [
+    ...(carCash > 0 && scenario.carMonthlyPaymentCny === undefined ? ["car" as const] : []),
+    ...(upfront > 0 && scenario.propertyMonthlyPaymentCny === undefined ? ["property" as const] : []),
+  ];
   const purchases = [
     { month: carMonth, outlay: carCash, label: "car" },
     { month: propertyMonth, outlay: upfront, label: "property" },
@@ -50,14 +54,15 @@ export function assessHouseholdLiquidity(finance: HouseholdFinanceInput, scenari
     : spend * amount(finance.reserveMonths, "reserveMonths") + amount(finance.plannedCommitmentsCny, "plannedCommitmentsCny");
   const combinedMonthlyPaymentCny = carPayment + propertyPayment;
   const cap = scenario.combinedMonthlyPaymentCapCny === undefined ? undefined : amount(scenario.combinedMonthlyPaymentCapCny, "combinedMonthlyPaymentCapCny");
-  const paymentHeadroomCny = cap === undefined ? undefined : cap - combinedMonthlyPaymentCny;
+  const paymentHeadroomCny = cap === undefined || missingMonthlyPaymentInputs.length ? undefined : cap - combinedMonthlyPaymentCny;
   const postPurchaseMonthlyCashFlowCny = monthlyFreeCashFlowCny - combinedMonthlyPaymentCny;
   const status = reserveFloorCny === undefined ? "unknown" : minimumReserveCny < reserveFloorCny ? "below-floor" : "within-floor";
-  const paymentStatus = cap === undefined ? "unknown" : combinedMonthlyPaymentCny > cap || postPurchaseMonthlyCashFlowCny < 0 ? "over-cap" : "within-cap";
+  const paymentStatus = cap === undefined || missingMonthlyPaymentInputs.length ? "unknown" : combinedMonthlyPaymentCny > cap || postPurchaseMonthlyCashFlowCny < 0 ? "over-cap" : "within-cap";
   const reasons = [
     status === "unknown" ? "reserve floor is missing; liquidity safety cannot be judged"
       : status === "below-floor" ? "the purchase sequence would reduce liquid reserve below the configured floor" : "planned cash outlay stays above the configured reserve floor",
-    paymentStatus === "unknown" ? "combined monthly-payment cap is missing; payment safety is not judged"
+    ...missingMonthlyPaymentInputs.map(item => `${item} monthly payment is missing; numeric payment totals include supplied inputs only`),
+    paymentStatus === "unknown" ? cap === undefined ? "combined monthly-payment cap is missing; payment safety is not judged" : "monthly-payment inputs are incomplete; payment safety is not judged"
       : paymentStatus === "over-cap" ? "combined monthly payments exceed the configured cap or disposable income" : "combined monthly payments stay within the configured cap",
     ...(postPurchaseMonthlyCashFlowCny < 0 ? ["post-purchase cash flow is negative"] : []),
     ...(finance.incomeStability && finance.incomeStability !== "stable" ? ["income continuity is an assumption; reassess under a separate stress scenario"] : []),
@@ -68,7 +73,7 @@ export function assessHouseholdLiquidity(finance: HouseholdFinanceInput, scenari
     savingsBeforePurchasesCny: monthlyFreeCashFlowCny * (purchases[0]?.month ?? 0),
     remainingReserveCny: balance, minimumReserveCny,
     ...(reserveFloorCny === undefined ? {} : { reserveFloorCny }),
-    combinedMonthlyPaymentCny, ...(paymentHeadroomCny === undefined ? {} : { paymentHeadroomCny }),
+    missingMonthlyPaymentInputs, combinedMonthlyPaymentCny, ...(paymentHeadroomCny === undefined ? {} : { paymentHeadroomCny }),
     events, postPurchaseMonthlyCashFlowCny, paymentStatus, status,
     paused: status !== "within-floor" || paymentStatus !== "within-cap" || postPurchaseMonthlyCashFlowCny < 0, reasons,
   };

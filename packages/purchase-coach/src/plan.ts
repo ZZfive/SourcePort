@@ -39,7 +39,9 @@ export function createPurchasePlan(profile: BuyerProfile, property?: PropertyRep
   }));
   const unknowns = [
     ...(liquidity.status === "unknown" ? ["现金储备底线尚未配置"] : []),
-    ...(liquidity.paymentStatus === "unknown" ? ["车房合计月供上限尚未配置"] : []),
+    ...(profile.scenario?.combinedMonthlyPaymentCapCny === undefined ? ["车房合计月供上限尚未配置"] : []),
+    ...(liquidity.missingMonthlyPaymentInputs.includes("property") ? ["房贷月供尚未输入；已输入月供合计不能当作实际房贷月供"] : []),
+    ...(liquidity.missingMonthlyPaymentInputs.includes("car") ? ["车贷月供尚未输入；若计划全款购车，请显式填 0"] : []),
     ...(candidates.some(candidate => candidate.eligibility !== "eligible") ? ["部分房产候选仍有未知或冲突证据"] : []),
   ];
   const pausedCandidateIds = candidates.filter(candidate => candidate.eligibility !== "eligible").map(candidate => candidate.candidateId);

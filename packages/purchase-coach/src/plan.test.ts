@@ -21,4 +21,14 @@ describe("purchase plan", () => {
     expect(report.property.pausedCandidateIds).toEqual(["c1"]);
     expect(report.nextActions.join(" ")).toContain("核验");
   });
+
+  it("does not describe an unpriced property loan as a known zero payment", () => {
+    const report = createPurchasePlan({
+      finance: { monthlyNetIncomeCny: 30_000, annualBaselineSpendCny: 120_000, liquidReserveCny: 1_000_000, reserveMonths: 12 },
+      scenario: { propertyUpfrontCny: 800_000, combinedMonthlyPaymentCapCny: 10_000 },
+    });
+    expect(report.liquidity.paymentStatus).toBe("unknown");
+    expect(report.unknowns).toContain("房贷月供尚未输入；已输入月供合计不能当作实际房贷月供");
+    expect(report.unknowns).not.toContain("车房合计月供上限尚未配置");
+  });
 });
